@@ -171,6 +171,16 @@ Javis 那层没有公开，图谱可以换成 [Graphiti](https://github.com/getz
 - 每个 Bot 一个组（`GRAPHITI_GROUP_ID`），互相看不到。只读：查的时候不改图谱。
 - 花多少：2026-11-06 自测（官方服务 1.1.3 + gpt-6-luna，虚构的 23 条消息切成 9 段）每段约 1.5 万 token；按每段 2 万估，约合每 1,000 条消息 250 万 token。本地 Ollama 不花钱但慢。
 
+## 事实库用 memv2 精简版（后端 B）
+
+原版 memv2 没有公开，这里带一个公开的精简版 `memv2-lite.js`（命令 `javmem-memv2`）：同样的读接口，`memv2-mcp.js` 和 `memory-mcp.js` 不用改；一个 Node 程序加一个 SQLite 文件，不要 GPU，库一开始是空的。见 [backend/memv2/README.md](backend/memv2/README.md)。
+
+- **怎么记**：原话都存下来；一段对话（最多 8 条）问一次模型，抽出值得记的事，每条都要从原话里逐字抄一句当证据，抄的找不到、数字对不上的丢掉；新的说法推翻旧的，旧的标「已被取代」，用户记不清的说法不算推翻；别的 AI 记得的事（继承包）直接存，不问模型。
+- **模型自选**：任何 OpenAI 兼容服务（OpenAI、DeepSeek、千问、本地 Ollama）；向量可选，不设就只按词搜。可再设一个便宜模型只管短段落。
+- **送进去**：`javmem-feed --memv2 <地址> --memv2-token-file <可写令牌> --namespace <分区>`；每个 Bot 一个分区、一个只读令牌，令牌只存哈希。
+- **花多少**：按模型自己报的用量算，每天有上限（默认 100 万 token）。2026-11-06 自测（gpt-6-luna，虚构的 23 条消息分 9 段）：共 12,804 token，每段约 1,600，约合每 1,000 条消息 60 万 token。
+- 是照原版的做法重写的，不是原版的代码：接口和抽取的规矩一样，字段更少，没有原版的文件抽取、别名合并和核对后台。
+
 ## 做了什么
 
 - **只读**：三个程序都只转发查询，不改 memv2 和 Javis 里的任何东西。
@@ -213,7 +223,7 @@ Javis 那层没有公开，图谱可以换成 [Graphiti](https://github.com/getz
 - **memv2 在运行**，程序要知道它的地址（默认 `http://127.0.0.1:8766`，即本机的 8766 端口）。每个 Bot 还要一个只读令牌，相当于这个 Bot 的借阅证：由 memv2 的管理员发，发的时候就定好它能查哪些分区（memv2 里叫命名空间）。令牌存在一个文件里，配置里只写这个文件的路径（`MEMV2_TOKEN_FILE`）。
 - **Javis 在运行**，程序要知道它的地址（默认 `http://127.0.0.1:8765/mcp`），还要 Javis 的令牌，同样存在文件里。每个 Bot 能看哪些账号，写在这个 Bot 的配置文件里（`JAVIS_TOKEN_FILE`，格式见下文）。
 
-**注意**：memv2 和 Javis 这两层目前没有公开发布，`memv2-mcp.js` 和 `javis-mcp.js` 默认调用的正是它们自己的查询接口。不搭它们也能用：本地库装上就有；图谱可以换成 Graphiti 官方服务（`JAVIS_BACKEND=graphiti`，见「图谱接 Graphiti 官方服务」）。
+**注意**：原版 memv2 和 Javis 目前没有公开发布，`memv2-mcp.js` 和 `javis-mcp.js` 默认调用的正是它们自己的查询接口。不搭它们也能用：本地库装上就有；事实库可以用公开的 memv2 精简版（`javmem-memv2`，见「事实库用 memv2 精简版」）；图谱可以换成 Graphiti 官方服务（`JAVIS_BACKEND=graphiti`，见「图谱接 Graphiti 官方服务」）。
 
 ## 配置（环境变量）
 

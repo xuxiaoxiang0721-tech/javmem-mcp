@@ -1,0 +1,26 @@
+# javmem's fact store (backend B) in a container: memv2-lite, built from this package. Without Docker it runs as
+# `npx -y -p javmem-mcp javmem-memv2 serve` just as well (see README.md here). The store starts empty.
+#   cp .env.example .env    # then choose the models in .env
+#   docker compose up -d --build
+#   docker compose exec memv2 node memv2-lite.js token add <name> --namespace <ns>,shared [--write]
+name: javmem-memv2
+
+services:
+  memv2:
+    build:
+      context: ../..
+      dockerfile: backend/memv2/Dockerfile
+    image: javmem-memv2-lite:local
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - memv2_data:/data
+    ports:
+      - "127.0.0.1:${MEMV2_PORT:-8766}:8766"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  memv2_data:

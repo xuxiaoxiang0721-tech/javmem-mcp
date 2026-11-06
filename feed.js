@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // feed.js (command javmem-feed): sends what javmem's local store holds (a Bot's own conversations, memory inherited
-// from other AIs) to a store that extracts facts from it, so that store has something to find. Here: the official
-// Graphiti MCP server (JAVIS_BACKEND=graphiti in javis-mcp.js reads it back).
+// from other AIs) to a store that extracts facts from it, so that store has something to find: the official Graphiti
+// MCP server (JAVIS_BACKEND=graphiti in javis-mcp.js reads it back) and memv2-lite (memv2-mcp.js reads it). For
+// memv2-lite it only hands over settled stretches: memv2-lite keeps its own queue and budget. For Graphiti:
 // Extraction costs model tokens, so the feeder is careful with it:
 //   - a conversation goes in once it has settled (enough new messages, or quiet for a while), in stretches of a few
 //     messages (an "episode"); each stretch goes in once, as the store's episodes table records;
@@ -200,6 +201,62 @@ async function feedGraphiti(store, o = {}) {
   return report;
 }
 
+/** One JSON request to memv2-lite (or a memv2 with the same ingest interface), with a client token. */
+function memv2Request(url, method, p, body, token, timeoutMs = 60000) {
+  const u = new URL(p, url);
+  const data = body == null ? null : Buffer.from(JSON.stringify(body), 'utf8');
+  return new Promise((resolve, reject) => {
+    const req = (u.protocol === 'https:' ? require('https') : require('http')).request({
+      method, host: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : 80), path: u.pathname, agent: false, timeout: timeoutMs,
+      headers: { Authorization: `Bearer ${token}`, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': data.length } : {}) },
+    }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        let json = null;
+        try { json = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { /* not JSON */ }
+        if (res.statusCode === 200 && json) resolve(json);
+        else reject(Object.assign(new Error(`memv2 拒绝了（HTTP ${res.statusCode}${json && json.error ? `，${json.error}` : ''}）`), { status: res.statusCode }));
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('等 memv2 回应超时')));
+    req.on('error', (err) => reject(err.code === 'ECONNREFUSED' ? new Error(`memv2 没在运行（${u.host} 连不上）。`) : err));
+    req.end(data || undefined);
+  });
+}
+
+/**
+ * One pass for memv2-lite: settled stretches go to /api/v1/ingest into one namespace (the Bot's), each once.
+ * memv2-lite keeps its own queue, budget and token count, so everything ready goes at once.
+ */
+async function feedMemv2(store, o = {}) {
+  const opts = { ...DEFAULTS, ...o };
+  const ns = opts.namespace || 'shared';
+  const now = () => (opts.now != null ? opts.now : Date.now());
+  const token = opts.token || (opts.tokenFile ? fs.readFileSync(opts.tokenFile, 'utf8').trim() : '');
+  if (!token) throw new Error('没有 memv2 的写入令牌（--memv2-token-file）。');
+  const report = { sent: 0, windows: 0 };
+  for (const seg of segments(store.unfed('memv2', ns, 5000), { ...opts, now: now() })) {
+    const first = seg[0];
+    const last = seg[seg.length - 1];
+    const r = await memv2Request(opts.url, 'POST', '/api/v1/ingest', {
+      session: { id: first.session, title: first.title || null, source: provider(first.origin), namespace: ns },
+      owner: opts.owner || '', assistant: opts.assistant || '',
+      messages: seg.map((m) => ({ seq: m.seq, role: m.role, time: m.time, text: m.text })),
+    }, token);
+    const uuid = episodeId(`memv2:${ns}`, first.session, first.seq, last.seq);
+    store.addEpisode({
+      uuid, backend: 'memv2', grp: ns, session: first.session, seq_from: first.seq, seq_to: last.seq, count: seg.length,
+      chars: seg.reduce((n, m) => n + String(m.text || '').length, 0), first_time: first.time || null, body: '', source: 'message',
+    });
+    store.setEpisode(uuid, { state: 'done', sent_at: iso(now()), done_at: iso(now()) });
+    report.sent += 1;
+    report.windows += r.windows || 0;
+  }
+  report.counts = store.episodeCounts('memv2', ns);
+  return report;
+}
+
 function main(argv) {
   const flag = (n, d) => {
     const i = argv.indexOf(n);
@@ -212,9 +269,11 @@ function main(argv) {
   const db = flag('--db');
   if (!db || argv.includes('--help')) {
     process.stdout.write([
-      '用法：javmem-feed --db <本地库> [--graphiti <图谱服务地址>] [--group <组>] [--owner <名字>] [--assistant <名字>]',
-      '      [--daily-tokens <每天上限>] [--window <同时处理几段>] [--watch <秒>] [--status]',
-      `把本地库里的对话送进 Graphiti 官方服务抽取事实（默认 ${DEFAULT_URL}）。只打印计数。`,
+      '用法：javmem-feed --db <本地库> [--graphiti <图谱服务地址>] [--group <组>]',
+      '      [--memv2 <memv2 地址> --memv2-token-file <写入令牌文件> --namespace <分区>]',
+      '      [--owner <名字>] [--assistant <名字>] [--daily-tokens <每天上限>] [--window <同时处理几段>] [--watch <秒>] [--status]',
+      `把本地库里的对话送进图谱（Graphiti 官方服务，默认 ${DEFAULT_URL}）或 memv2 精简版抽取事实；两个都写就两边都送。`,
+      '只打印计数。',
       '',
     ].join('\n'));
     return Promise.resolve(db ? 0 : 2);
@@ -225,27 +284,36 @@ function main(argv) {
   }
   const store = new LocalStore(db);
   const group = flag('--group', process.env.GRAPHITI_GROUP_ID || 'main');
+  const toMemv2 = flag('--memv2');
+  const toGraph = argv.includes('--graphiti') || !toMemv2;
+  const names = { owner: flag('--owner', process.env.MEMORY_OWNER || ''), assistant: flag('--assistant', process.env.MEMORY_ASSISTANT || '') };
   const opts = {
-    url: flag('--graphiti', process.env.JAVIS_URL || DEFAULT_URL), group,
-    owner: flag('--owner', process.env.MEMORY_OWNER || ''), assistant: flag('--assistant', process.env.MEMORY_ASSISTANT || ''),
+    url: flag('--graphiti', process.env.JAVIS_URL || DEFAULT_URL), group, ...names,
     dailyTokens: num('--daily-tokens', DEFAULTS.dailyTokens), window: num('--window', DEFAULTS.window),
   };
+  const mopts = { url: toMemv2, tokenFile: flag('--memv2-token-file', process.env.MEMV2_WRITE_TOKEN_FILE || ''), namespace: flag('--namespace', 'shared'), ...names };
   const print = (r) => {
     const c = r.counts;
     const t = r.today;
-    process.stdout.write(`${new Date().toISOString()} 新切 ${r.added} 段，送出 ${r.sent} 段，完成 ${r.confirmed} 段`
+    process.stdout.write(`${new Date().toISOString()} 图谱：新切 ${r.added} 段，送出 ${r.sent} 段，完成 ${r.confirmed} 段`
       + `${r.resent ? `，重送 ${r.resent} 段` : ''}${r.failed ? `，放弃 ${r.failed} 段` : ''}；`
       + `图谱里 ${c.done} 段，处理中 ${c.sent} 段，排队 ${c.pending} 段，失败 ${c.failed} 段；`
       + `今天约用 ${t.tokens} token（${t.segments} 段），上限 ${opts.dailyTokens}`
       + `${r.stopped === 'budget' ? '，已到上限，明天接着送' : ''}\n`);
   };
+  const printM = (r) => process.stdout.write(`${new Date().toISOString()} memv2：送出 ${r.sent} 段（${r.windows} 个抽取窗口），`
+    + `一共送过 ${r.counts.done} 段；抽取的进度和用量看 memv2 的 /api/v1/status\n`);
   if (argv.includes('--status')) {
-    print({ added: 0, sent: 0, confirmed: 0, counts: store.episodeCounts('graphiti', group), today: store.spend(localDay(), 'graphiti') });
+    if (toGraph) print({ added: 0, sent: 0, confirmed: 0, counts: store.episodeCounts('graphiti', group), today: store.spend(localDay(), 'graphiti') });
+    if (toMemv2) printM({ sent: 0, windows: 0, counts: store.episodeCounts('memv2', mopts.namespace) });
     store.close();
     return Promise.resolve(0);
   }
   const every = num('--watch', 0) * 1000;
-  const once = () => feedGraphiti(store, opts).then(print);
+  const once = async () => {
+    if (toMemv2) printM(await feedMemv2(store, mopts));
+    if (toGraph) print(await feedGraphiti(store, opts));
+  };
   if (!every) {
     return once().then(() => 0, (err) => {
       process.stderr.write(`${err.message}\n`);
@@ -262,4 +330,4 @@ if (require.main === module) {
   main(process.argv.slice(2)).then((code) => { process.exitCode = code; });
 }
 
-module.exports = { DEFAULTS, segments, episodeOf, speaker, feedGraphiti, localDay, main };
+module.exports = { DEFAULTS, segments, episodeOf, speaker, feedGraphiti, feedMemv2, memv2Request, localDay, main };

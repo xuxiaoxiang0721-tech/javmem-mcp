@@ -171,6 +171,16 @@ Javis is not public, so the graph can be the official [Graphiti](https://github.
 - One group per Bot (`GRAPHITI_GROUP_ID`), invisible to the others. Read-only: queries change nothing in the graph.
 - Cost: measured 2026-11-06 (official server 1.1.3 with gpt-6-luna, 23 made-up messages in 9 episodes) about 15,000 tokens per episode; counted as 20,000, roughly 2.5 million tokens per 1,000 messages. A local Ollama costs nothing but is slow.
 
+## The fact store as memv2-lite (backend B)
+
+The original memv2 is not public, so the package carries a small public one, `memv2-lite.js` (command `javmem-memv2`): the same read interface, so `memv2-mcp.js` and `memory-mcp.js` work unchanged; one Node process and one SQLite file, no GPU, empty at the start. See [backend/memv2/README.md](backend/memv2/README.md).
+
+- **How it remembers**: every message is kept; each stretch of conversation (up to 8 messages) is one model call that lists the facts worth keeping, each with a quote copied word for word from a message, and a fact whose quote is not there or whose numbers do not match is dropped; a newer statement supersedes an older one, an unsure recollection does not; facts inherited from other AIs go in as they are, with no model call.
+- **Your choice of models**: any OpenAI-compatible service (OpenAI, DeepSeek, Qwen, a local Ollama); embeddings are optional (without them it searches by words); an optional cheaper model for short stretches.
+- **In**: `javmem-feed --memv2 <address> --memv2-token-file <writable token> --namespace <namespace>`; one namespace and one read-only token per Bot, only token hashes stored.
+- **Cost**: counted from what the model reports, within a daily budget (default 1,000,000 tokens). Measured 2026-11-06 (gpt-6-luna, 23 made-up messages in 9 stretches): 12,804 tokens, about 1,600 per stretch, roughly 600,000 per 1,000 messages.
+- A rewrite in the original's spirit, not the original code: the same interface and extraction rules, fewer fields, none of the original's file extraction, alias merging or checking jobs.
+
 ## What they do
 
 - **Read-only**: all three only forward queries and change nothing in memv2 or Javis.
@@ -213,7 +223,7 @@ The servers store no memory; they only query the two memory stores for the Bots.
 - **memv2 running**, at an address they know (default `http://127.0.0.1:8766`, port 8766 on this machine). Every Bot needs a read-only token, its library card so to speak: memv2's administrator issues it and decides at that moment which partitions (namespaces, in memv2) it may read. The token lives in a file; the configuration only holds that file's path (`MEMV2_TOKEN_FILE`).
 - **Javis running**, at an address they know (default `http://127.0.0.1:8765/mcp`), and Javis's token, also in a file. The accounts each Bot may see are in that Bot's profile (`JAVIS_TOKEN_FILE`, format below).
 
-**Note**: memv2 and Javis themselves are not publicly released at the moment, and `memv2-mcp.js` and `javis-mcp.js` talk to their own query interfaces by default. Without them: the local store works as installed, and the graph can be the official Graphiti server (`JAVIS_BACKEND=graphiti`, see "The graph on the official Graphiti server").
+**Note**: the original memv2 and Javis are not publicly released at the moment, and `memv2-mcp.js` and `javis-mcp.js` talk to their own query interfaces by default. Without them: the local store works as installed, the fact store can be the public memv2-lite (`javmem-memv2`, see "The fact store as memv2-lite"), and the graph can be the official Graphiti server (`JAVIS_BACKEND=graphiti`, see "The graph on the official Graphiti server").
 
 ## Configuration (environment variables)
 

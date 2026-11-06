@@ -359,6 +359,90 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   ok('Graphiti backend: feeder (settle, window, lost, budget, next day), four tools, status, combined server');
 }
 
+// memv2-lite (backend B) with a stand-in model: javmem-feed sends settled stretches into a Bot's namespace; the worker
+// extracts facts that quote their message (made-up quotes and numbers dropped), keeps inherited facts as they are
+// without a model call, uses the cheaper model on short stretches, marks the replaced fact superseded and stops at
+// the day's budget; memv2-mcp.js reads it unchanged, within its token's namespaces.
+{
+  const { createRequire } = await import('node:module');
+  const req = createRequire(import.meta.url);
+  const { LocalStore } = req('../local-store.js');
+  const { importPackage } = req('../inherit.js');
+  const { feedMemv2 } = req('../feed.js');
+  const lite = req('../memv2-lite.js');
+  const { startFakeLlm } = await import('./fake-llm.mjs');
+  const llm = await startFakeLlm();
+  const cfg = {
+    ...lite.config(), db: join(scratch, 'memv2-lite.sqlite'), llmUrl: llm.url, llmKey: 'x', model: 'quality-model',
+    cheapModel: 'cheap-model', embedUrl: llm.url, embedKey: 'x', embedModel: 'emb', embedDim: 0, dailyTokens: 2200,
+  };
+  const ms = new lite.Store(cfg.db);
+  const worker = new lite.Worker(ms, cfg);
+  const server = lite.createServer(ms, cfg, null);
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const writeToken = ms.addClient('feeder', { namespaces: ['bot-a', 'shared'], write: true });
+  const tokA = join(scratch, 'lite-a.token');
+  writeFileSync(tokA, `${ms.addClient('bot-a', { namespaces: ['bot-a', 'shared'] })}\n`);
+  const tokB = join(scratch, 'lite-b.token');
+  writeFileSync(tokB, `${ms.addClient('bot-b', { namespaces: ['bot-b'] })}\n`);
+
+  const db = join(scratch, 'lite-local.sqlite');
+  const s = new LocalStore(db);
+  s.add({ id: 'sess-1', title: '小雨的游泳课', origin: 'session' }, [
+    { seq: 1, role: 'user', time: '2026-08-30T20:11:00+08:00', text: '小雨的游泳课在每周二下午。' },
+    { seq: 2, role: 'assistant', time: '2026-08-30T20:12:00+08:00', text: '好的，记下了。' },
+    { seq: 3, role: 'user', time: '2026-09-14T19:02:00+08:00', text: '小雨的游泳课改到每周三下午了，教练是周教练。' },
+    { seq: 4, role: 'user', time: '2026-10-02T21:30:00+08:00', text: '刚给小雨交了三个月的游泳课学费，2400 元。' },
+  ], 4);
+  importPackage(s, readFileSync(join(root, 'demo', 'inherit-grok.json'), 'utf8'));
+  const sent = await feedMemv2(s, { url, token: writeToken, namespace: 'bot-a', owner: '小明', assistant: '小助手', now: Date.parse('2026-11-06T12:00:00+08:00') });
+  assert.deepEqual([sent.sent, sent.windows], [4, 4], 'three stretches of talk (split at the long pauses) and the package');
+  const again = await feedMemv2(s, { url, token: writeToken, namespace: 'bot-a', now: Date.parse('2026-11-06T13:00:00+08:00') });
+  assert.equal(again.sent, 0, 'each stretch once');
+  s.close();
+  const s2 = new LocalStore(db);
+  await assert.rejects(feedMemv2(s2, { url, token: 'wrong', namespace: 'bot-x', now: Date.parse('2026-11-06T12:00:00+08:00') }), /HTTP 401，invalid_client_token/);
+  s2.close();
+
+  await worker.run();
+  assert.equal(worker.paused, 'budget', 'the day budget stops extraction');
+  assert.equal(llm.state.chats, 2);
+  cfg.dailyTokens = 1000000;
+  await worker.run();
+  assert.equal(worker.paused, null);
+  assert.equal(llm.state.chats, 3, 'three stretches of talk; the inherited package needs no model');
+  assert.ok(llm.state.models.every((m) => m === 'cheap-model'), 'short stretches go to the cheaper model');
+  const w = ms.all('SELECT tier, kept, dropped FROM windows ORDER BY id');
+  assert.deepEqual(w.map((x) => x.tier), ['direct', 'cheap', 'cheap', 'cheap'], 'the package (oldest) went first, without a model');
+  assert.ok(w.slice(1).every((x) => x.dropped === 2), 'the made-up quote and the made-up number are dropped');
+  const counts = ms.counts();
+  assert.deepEqual([counts.items, counts.superseded, counts.windows.done], [7, 1, 4]);
+
+  const call = (name, args) => ({ method: 'tools/call', params: { name, arguments: args } });
+  const env = { MEMV2_URL: url, MEMV2_TOKEN_FILE: tokA, MEMV2_NAMESPACE: 'bot-a', MEMORY_OWNER: '小明' };
+  const a = await session('memv2-mcp.js', env, [{},
+    call('recall', { query: '小雨的游泳课是哪天' }), call('search', { query: '游泳课', include_superseded: true }),
+    call('search_raw', { query: '周教练' }), call('read_record', { record_key: 'sess-1:3' }), { method: 'javmem/status', params: {} },
+    call('search', { entity: '小雨' })]);
+  const t = (n) => text(a.get(n).result);
+  assert.match(t(1), /\[2026-09-14\] 小雨的游泳课改到每周三下午了，教练是周教练。 \(bot-a\)/);
+  assert.ok(!/每周二下午/.test(t(1)), 'recall shows what holds now');
+  assert.match(t(2), /\[2026-08-30\] 小雨的游泳课在每周二下午。 \(bot-a\)（已被后来的说法取代）/);
+  assert.match(t(3), /周教练/);
+  assert.match(t(4), /"record_key": "sess-1:3"/);
+  assert.equal(a.get(5).result.stores[0].state, 'ok');
+  assert.match(t(6), /^\[2026-09-14\] [^\n]*\n\[2026-10-02\] /, 'entity search: what holds now, in time order');
+  const b = await session('memv2-mcp.js', { ...env, MEMV2_TOKEN_FILE: tokB }, [{}, call('search', { query: '游泳课' })]);
+  assert.match(text(b.get(1).result), /namespace_forbidden/);
+  const c = await session('memv2-mcp.js', { ...env, MEMV2_TOKEN_FILE: tokB, MEMV2_NAMESPACE: '' }, [{}, call('search', { query: '游泳课' })]);
+  assert.match(text(c.get(1).result), /没有找到/, 'another Bot sees nothing of bot-a');
+  server.close();
+  ms.close();
+  await llm.close();
+  ok('memv2-lite: feed once, quotes checked, budget, cheap tier, superseded, inherited without a model, per-Bot tokens');
+}
+
 // scripts/eval.mjs on the demo questions: the counts it prints, and nothing but counts.
 {
   const { spawnSync } = await import('node:child_process');
