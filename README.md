@@ -34,6 +34,16 @@
 3. **自测**（git 方式）：`node test/smoke.mjs`，不需要两个库在跑。
 4. **接上**：见下面的「接到 Claude Code」和「接到 DeepSeek Harness（Tobs）」。环境变量至少给 `MEMV2_TOKEN_FILE` 和 `JAVIS_TOKEN_FILE`。
 
+## 先试试：演示数据
+
+不搭两个库也能看到效果：把 `MEMV2_URL` 和 `JAVIS_URL` 都设成 `demo`，三个程序就改读包里自带的虚构数据，回答格式和真库一样，也不要令牌。数据是一个虚构的「小明」：女儿小雨的游泳课、同事老陈调岗、十一月去千岛湖。
+
+![演示：两个库对照着回答](docs/demo.png)
+
+- 命令行：`git clone` 以后运行 `node scripts/demo.mjs`，五个工具各问一遍。
+- Claude Code（npm 包发布后）：`claude mcp add javmem-demo -e MEMV2_URL=demo -e JAVIS_URL=demo -- npx -y javmem-mcp`，然后问「小雨的游泳课学费交了多少？」「老陈最近怎么了？」。
+- 数据里故意放了几种情况：两个库一致（「图库也有」）；说法不同（学费 2400 和 2600，以 memv2 为准）；只在图库有；一条和原文对不上的编造事实（被过滤掉，回答里提示「另有 1 条和原文对不上」）。分区也能试：`MEMV2_NAMESPACE=work` 加 `MEMV2_BOT_ONLY=1` 只看工作，`JAVIS_SOURCES=chatgpt` 只看一个账号。
+
 ## 接到 Claude Code
 
 一条命令（npm 包发布后）：
@@ -155,7 +165,7 @@ claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_T
 | `MEMV2_TOKEN_FILE` | 必填。存只读客户端令牌的文件路径（令牌本身不要写进环境变量） |
 | `MEMV2_NAMESPACE` | 只查这一个命名空间；不填 = 这个客户端能查的全部 |
 | `MEMV2_BOT_ONLY` | `1` = 只查上面那个命名空间，不带总区 |
-| `MEMV2_URL` | 默认 `http://127.0.0.1:8766` |
+| `MEMV2_URL` | 默认 `http://127.0.0.1:8766`；`demo` = 读包里的虚构演示数据（见「先试试」） |
 | `MEMV2_PURPOSE` | `eval` = 带上 `X-IM-Purpose: eval`，让 memv2 把测试调用单独计数 |
 | `MEMV2_AUDIENCE` | `cc` = 用的是 Bot 的 Claude Code（工具标成只读）；不填 = Bot 的聊天前台 |
 
@@ -165,7 +175,7 @@ claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_T
 |---|---|
 | `JAVIS_TOKEN_FILE` | 必填。Bot 的配置文件（每行 `KEY=value`：`JAVIS_SOURCES=<账号，逗号隔开，或 *>`、`JAVIS_TOKEN_FROM=<存 Javis 令牌的文件>`），或者直接给存令牌的文件（这时所有账号都能看） |
 | `JAVIS_SOURCES` | 覆盖配置文件里的账号；`*` = 全部 |
-| `JAVIS_URL` | 默认 `http://127.0.0.1:8765/mcp` |
+| `JAVIS_URL` | 默认 `http://127.0.0.1:8765/mcp`；`demo` = 读包里的虚构演示数据 |
 | `JAVIS_HIDE_FILE` | 隐藏名单，默认程序旁边的 `hidden.json`（没有 = 不隐藏） |
 | `JAVIS_VERIFY_FILE` | 判定文件，默认程序旁边的 `verify/verdicts.jsonl`（没有 = 每条事实都按规则查） |
 | `JAVIS_AUDIENCE` | 同上 |
@@ -190,7 +200,7 @@ claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_T
 node test/smoke.mjs
 ```
 
-不需要 memv2 和 Javis 在跑：测三个程序的握手（版本号）、工具名单、主人名字、令牌缺失和服务没起来时的报错、合起来的工具在一个库出错时照样回答，以及 `javmem/status` 的几种状态。GitHub Actions 在 Node 20、22、24 上各跑一遍。
+不需要 memv2 和 Javis 在跑：测三个程序的握手（版本号）、工具名单、主人名字、令牌缺失和服务没起来时的报错、合起来的工具在一个库出错时照样回答、`javmem/status` 的几种状态，以及演示数据上的 13 个工具。GitHub Actions 在 Node 20、22、24 上各跑一遍。截图用 `node scripts/screenshot.mjs` 重新生成（要本机有 Chrome 或 Edge）。
 
 ## 安全
 

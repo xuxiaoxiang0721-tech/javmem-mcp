@@ -7,6 +7,7 @@
 - 发版文件：`node scripts/pack.mjs` 从已提交的内容打包（换行都是 LF），生成 npm 包和 GitHub Release 附件。
 - 状态检查：三个程序都认 `javmem/status` 请求（不是工具），回答每个库连不连得上、令牌能不能用，不读记忆，不带令牌。
 - README：开头一句话说清是什么，写明适合谁、不适合谁，接 Claude Code 的一条命令（`claude mcp add … -- npx -y javmem-mcp`）；英文版 `README.en.md` 和中文版内容对等；npm、CI、许可证徽章；CI 在 Node 20、22、24 上跑测试。
+- 演示数据：`MEMV2_URL=demo`、`JAVIS_URL=demo` 时读包里自带的虚构数据（`demo.js`、`demo/`），13 个工具都能答，不要令牌；`node scripts/demo.mjs` 把五个工具各问一遍；README 配了截图（`scripts/screenshot.mjs` 生成）。
 
 English:
 
@@ -15,6 +16,7 @@ English:
 - Release files: `node scripts/pack.mjs` packs the committed tree (LF line endings) into the npm tarball and the GitHub Release asset.
 - Status check: all three servers answer a `javmem/status` request (not a tool) with whether each store answers and takes the token; it reads no memory and carries no token.
 - README: a one-line pitch, who it is for and not for, one command for Claude Code (`claude mcp add … -- npx -y javmem-mcp`); `README.en.md` in English with the same content as the Chinese one; npm, CI and licence badges; CI runs the tests on Node 20, 22 and 24.
+- Demo data: with `MEMV2_URL=demo` and `JAVIS_URL=demo` the servers answer from made-up data in the package (`demo.js`, `demo/`), all thirteen tools, no token; `node scripts/demo.mjs` asks each of the five once; the README has a picture (made by `scripts/screenshot.mjs`).
 
 ## 0.2.0
 

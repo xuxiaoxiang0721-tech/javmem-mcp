@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "note": "Cross-check labels for the made-up demo data (MEMORY_LABELS_FILE defaults to this file when both stores are demo).",
+  "memv2": {
+    "demo-m1": { "l": "两边一致", "same": ["demo-j1"] },
+    "demo-m2": { "l": "两边不同", "diff": ["demo-j2"] },
+    "demo-m3": { "l": "两边一致", "same": ["demo-j3", "demo-j5"] },
+    "demo-m6": { "l": "两边一致", "same": ["demo-j4"] },
+    "demo-m4": { "l": "两边一致", "same": ["demo-j9"] },
+    "demo-m7": { "l": "只在 memv2" }
+  },
+  "javis": {
+    "demo-j1": { "l": "两边一致" },
+    "demo-j2": { "l": "两边不同" },
+    "demo-j3": { "l": "两边一致" },
+    "demo-j5": { "l": "两边一致" },
+    "demo-j4": { "l": "两边一致" },
+    "demo-j9": { "l": "两边一致" },
+    "demo-j6": { "l": "只在图库" }
+  }
+}

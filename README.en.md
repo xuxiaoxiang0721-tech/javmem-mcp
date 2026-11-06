@@ -34,6 +34,16 @@ In DeepSeek Harness's Tobs, the companion plugin [javmem-dsh-plugin](https://git
 3. **Self-test** (git): `node test/smoke.mjs`; the two stores need not run.
 4. **Connect**: see "With Claude Code" and "With DeepSeek Harness (Tobs)" below. Set at least `MEMV2_TOKEN_FILE` and `JAVIS_TOKEN_FILE`.
 
+## Try it first: demo data
+
+See it work without either store: set both `MEMV2_URL` and `JAVIS_URL` to `demo`, and the servers answer from the made-up data that ships with the package, in the same format as the real stores, with no token. The data is a fictional 小明 (Xiao Ming): his daughter's swimming lessons, his colleague 老陈 (Lao Chen) moving to another office, a November trip to 千岛湖 (Qiandao Lake).
+
+![Demo: both stores checked against each other](docs/demo.png)
+
+- In a terminal: after `git clone`, run `node scripts/demo.mjs` to ask each of the five tools once.
+- In Claude Code (once the npm package is published): `claude mcp add javmem-demo -e MEMV2_URL=demo -e JAVIS_URL=demo -- npx -y javmem-mcp`, then ask 「小雨的游泳课学费交了多少？」 (how much were the swimming lessons?) or 「老陈最近怎么了？」 (what is up with Lao Chen?).
+- The data holds each case on purpose: both stores agree (「图库也有」); they differ (a fee of 2400 against 2600, and memv2 counts); a fact only the graph has; and a made-up fact the source text does not back, which is dropped (the answer says 「另有 1 条和原文对不上」, one more did not match the source). Partitions work too: `MEMV2_NAMESPACE=work` with `MEMV2_BOT_ONLY=1` shows work only, `JAVIS_SOURCES=chatgpt` one account only.
+
 ## With Claude Code
 
 One command (once the npm package is published):
@@ -155,7 +165,7 @@ The servers store no memory; they only query the two memory stores for the Bots.
 | `MEMV2_TOKEN_FILE` | required. Path of the file holding the read-only client token (never the token itself in the environment) |
 | `MEMV2_NAMESPACE` | one namespace only; unset = everything the client may read |
 | `MEMV2_BOT_ONLY` | `1` = only that namespace, without the shared area |
-| `MEMV2_URL` | default `http://127.0.0.1:8766` |
+| `MEMV2_URL` | default `http://127.0.0.1:8766`; `demo` = the made-up demo data in the package (see "Try it first") |
 | `MEMV2_PURPOSE` | `eval` = send `X-IM-Purpose: eval`, so memv2 counts test calls apart |
 | `MEMV2_AUDIENCE` | `cc` = the reader is a Bot's Claude Code (tools marked read-only); unset = the Bot's chat front |
 
@@ -165,7 +175,7 @@ The servers store no memory; they only query the two memory stores for the Bots.
 |---|---|
 | `JAVIS_TOKEN_FILE` | required. The Bot's profile (`KEY=value` lines: `JAVIS_SOURCES=<accounts, comma separated, or *>`, `JAVIS_TOKEN_FROM=<the file holding Javis's token>`), or that token file itself (then every account is shown) |
 | `JAVIS_SOURCES` | overrides the profile's accounts; `*` = all |
-| `JAVIS_URL` | default `http://127.0.0.1:8765/mcp` |
+| `JAVIS_URL` | default `http://127.0.0.1:8765/mcp`; `demo` = the made-up demo data in the package |
 | `JAVIS_HIDE_FILE` | the hide list, default `hidden.json` next to the server (missing = nothing hidden) |
 | `JAVIS_VERIFY_FILE` | the verdict file, default `verify/verdicts.jsonl` next to the server (missing = every fact gets the rule check) |
 | `JAVIS_AUDIENCE` | as above |
@@ -190,7 +200,7 @@ The servers store no memory; they only query the two memory stores for the Bots.
 node test/smoke.mjs
 ```
 
-No memv2 or Javis needed: the three servers' handshake (with the version), tool lists, owner name, the errors for a missing token and a service that is down, the combined server answering when one store fails, and the states of `javmem/status`. GitHub Actions runs it on Node 20, 22 and 24.
+No memv2 or Javis needed: the three servers' handshake (with the version), tool lists, owner name, the errors for a missing token and a service that is down, the combined server answering when one store fails, the states of `javmem/status`, and all thirteen tools on the demo data. GitHub Actions runs it on Node 20, 22 and 24. `node scripts/screenshot.mjs` redraws the picture (it needs a local Chrome or Edge).
 
 ## Safety
 

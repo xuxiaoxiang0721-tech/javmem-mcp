@@ -8,7 +8,7 @@
 //                     client in its access policy and puts the token in this file; the token never goes in env)
 //   MEMV2_NAMESPACE   one memv2 namespace (e.g. shared); unset = everything the client may read
 //   MEMV2_BOT_ONLY    1 = that namespace only, without the shared area
-//   MEMV2_URL         default http://127.0.0.1:8766
+//   MEMV2_URL         default http://127.0.0.1:8766; demo = the made-up demo data in demo/ (nothing to install, no token)
 //   MEMV2_PURPOSE     eval = send X-IM-Purpose: eval, so memv2 counts the calls apart (tests only)
 //   MEMV2_AUDIENCE    cc = the reader is a Bot's Claude Code; unset = the Bot's chat front
 //   MEMORY_OWNER      whose memory it is, as the tools should name them (default 用户)
@@ -21,13 +21,14 @@ const http = require('http');
 const fs = require('fs');
 const readline = require('readline');
 
-const BASE = new URL(process.env.MEMV2_URL || 'http://127.0.0.1:8766');
+const DEMO = process.env.MEMV2_URL === 'demo';
+const BASE = new URL(DEMO ? 'http://demo.invalid' : (process.env.MEMV2_URL || 'http://127.0.0.1:8766'));
 const TOKEN_FILE = process.env.MEMV2_TOKEN_FILE || '';
 const NAMESPACE = process.env.MEMV2_NAMESPACE || '';
 const BOT_ONLY = process.env.MEMV2_BOT_ONLY === '1';
 const EVAL = process.env.MEMV2_PURPOSE === 'eval';
 const FOR_CC = process.env.MEMV2_AUDIENCE === 'cc';
-const OWNER = process.env.MEMORY_OWNER || '用户';
+const OWNER = process.env.MEMORY_OWNER || (DEMO ? '小明' : '用户');
 const SOURCE = process.env.MEMORY_SOURCE || '以前和 AI 的对话';
 const FIX_HOW = process.env.MEMORY_FIX_HOW || '找 memv2 的管理员，用 memv2 的命令改';
 // Its own agent, so an HTTP_PROXY that a host hands to child processes never applies.
@@ -145,7 +146,26 @@ const ERRORS = {
   invalid_request: 'memv2 认为请求的参数不对。',
 };
 
+// An answer of memv2 (status code and parsed body), as data or as the UserError a tool shows.
+function answer(statusCode, data, resolve, reject) {
+  if (statusCode >= 200 && statusCode < 300 && data) {
+    resolve(data);
+  } else {
+    const code = data && data.error;
+    const error = new UserError(`${ERRORS[code] || 'memv2 返回了错误'}（HTTP ${statusCode}${code ? `，${code}` : ''}）`);
+    error.status = statusCode;
+    error.code = code;
+    reject(error);
+  }
+}
+
 function memv2(method, path, payload, timeoutMs) {
+  if (DEMO) {
+    return new Promise((resolve, reject) => {
+      const { status: statusCode, body } = require('./demo.js').memv2(method, path, payload || {});
+      answer(statusCode, body, resolve, reject);
+    });
+  }
   return new Promise((resolve, reject) => {
     const body = payload === undefined ? null : Buffer.from(JSON.stringify(payload), 'utf8');
     const headers = { Authorization: `Bearer ${readToken()}` };
@@ -160,15 +180,7 @@ function memv2(method, path, payload, timeoutMs) {
       res.on('end', () => {
         let data = null;
         try { data = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { /* not JSON */ }
-        if (res.statusCode >= 200 && res.statusCode < 300 && data) {
-          resolve(data);
-        } else {
-          const code = data && data.error;
-          const error = new UserError(`${ERRORS[code] || 'memv2 返回了错误'}（HTTP ${res.statusCode}${code ? `，${code}` : ''}）`);
-          error.status = res.statusCode;
-          error.code = code;
-          reject(error);
-        }
+        answer(res.statusCode, data, resolve, reject);
       });
     });
     req.on('timeout', () => req.destroy(new Error('等 memv2 回应超时')));
@@ -347,6 +359,7 @@ const TOKEN_ERRORS = new Set(['unauthorized', 'unauthorized_client', 'invalid_cl
 // client's token? It reads no memory: it asks for a record that cannot exist, and memv2 checks the token before it
 // looks, so "not found" means the token works. The answer carries no token and no memory text.
 async function status() {
+  if (DEMO) return { store: 'memv2', url: 'demo', state: 'demo', detail: '这些都是虚构的示例，不是谁的真实记忆' };
   const out = { store: 'memv2', url: BASE.origin };
   try {
     readToken();
@@ -445,7 +458,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  VERSION, GUIDE, RAW_NOTE, MAX_TEXT, UserError, FOR_CC, OWNER, FIX_HOW,
+  VERSION, DEMO, GUIDE, RAW_NOTE, MAX_TEXT, UserError, FOR_CC, OWNER, FIX_HOW,
   memoryLine, searchLine, recordKeys, degradedNote, clip, excerpt, rawDay, intIn,
   recallItems, searchItems, rawHits, recall, search, searchRaw, readRecord, status,
 };

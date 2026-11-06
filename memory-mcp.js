@@ -12,16 +12,20 @@
 //   MEMORY_LABELS_FILE  the stores' cross-check labels (JSON: {memv2: {item_id: {l, same?, diff?}}, javis: {uuid: {...}}},
 //                       l = 两边一致 | 两边不同 | 只在 memv2 | 只在图库 | ...); missing = no marks
 //   MEMORY_AUDIENCE     cc = the reader is a Bot's Claude Code (also implied by MEMV2_AUDIENCE or JAVIS_AUDIENCE)
+// MEMV2_URL=demo and JAVIS_URL=demo run all five tools on the made-up data in demo/ (labels included).
 // When one store fails, the other still answers and the reply says which one did not.
 // No dependencies; stdout carries only JSON-RPC messages.
 'use strict';
 
 const fs = require('fs');
+const path = require('path');
 const readline = require('readline');
 const memv2 = require('./memv2-mcp.js');
 const javis = require('./javis-mcp.js');
 
-const LABELS_FILE = process.env.MEMORY_LABELS_FILE || '';
+// With both stores on the demo data, the demo's own cross-check labels unless another file is named.
+const LABELS_FILE = process.env.MEMORY_LABELS_FILE
+  || (memv2.DEMO && javis.DEMO ? path.join(__dirname, 'demo', 'labels.json') : '');
 const FOR_CC = memv2.FOR_CC || javis.FOR_CC || process.env.MEMORY_AUDIENCE === 'cc';
 const OWNER = memv2.OWNER;
 const SOURCE = process.env.MEMORY_SOURCE || '以前和 AI 的对话';

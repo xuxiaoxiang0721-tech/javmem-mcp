@@ -23,6 +23,9 @@
     "memory-mcp.js",
     "memv2-mcp.js",
     "javis-mcp.js",
+    "demo.js",
+    "demo/",
+    "scripts/demo.mjs",
     "README.md",
     "README.en.md",
     "CHANGELOG.md",
@@ -30,7 +33,8 @@
   ],
   "scripts": {
     "test": "node test/smoke.mjs",
-    "pack": "node scripts/pack.mjs"
+    "pack": "node scripts/pack.mjs",
+    "demo": "node scripts/demo.mjs"
   },
   "engines": {
     "node": ">=20"

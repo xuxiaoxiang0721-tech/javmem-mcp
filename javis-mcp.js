@@ -16,7 +16,8 @@
 //   JAVIS_TOKEN_FILE  a Bot profile (KEY=value lines: JAVIS_SOURCES=<accounts or *>, JAVIS_TOKEN_FROM=<the file that
 //                     holds Javis's MCP token>), or that token file itself (then every account is shown)
 //   JAVIS_SOURCES     overrides the profile's accounts, comma separated; * = all
-//   JAVIS_URL         default http://127.0.0.1:8765/mcp
+//   JAVIS_URL         default http://127.0.0.1:8765/mcp; demo = the made-up demo data in demo/ (nothing to install, no
+//                     token; JAVIS_TOKEN_FILE may still name a profile, for its JAVIS_SOURCES)
 //   JAVIS_HIDE_FILE   the hide list (JSON: {facts, entities, sessions, messages}), default hidden.json next to this
 //                     file (missing = nothing hidden)
 //   JAVIS_VERIFY_FILE verdict lines ({"id","h":hex sha256(fact)[:16],"v":"pass|fail|unsure"}; the last line per fact
@@ -35,12 +36,14 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 
-const ENDPOINT = new URL(process.env.JAVIS_URL || 'http://127.0.0.1:8765/mcp');
+const DEMO = process.env.JAVIS_URL === 'demo';
+const ENDPOINT = new URL(DEMO ? 'http://demo.invalid/mcp' : (process.env.JAVIS_URL || 'http://127.0.0.1:8765/mcp'));
 const TOKEN_FILE = process.env.JAVIS_TOKEN_FILE || '';
 const HIDE_FILE = process.env.JAVIS_HIDE_FILE || path.join(__dirname, 'hidden.json');
-const VERIFY_FILE = process.env.JAVIS_VERIFY_FILE || path.join(__dirname, 'verify', 'verdicts.jsonl');
+const VERIFY_FILE = process.env.JAVIS_VERIFY_FILE
+  || (DEMO ? path.join(__dirname, 'demo', 'verdicts.jsonl') : path.join(__dirname, 'verify', 'verdicts.jsonl'));
 const FOR_CC = process.env.JAVIS_AUDIENCE === 'cc';
-const OWNER = process.env.MEMORY_OWNER || '用户';
+const OWNER = process.env.MEMORY_OWNER || (DEMO ? '小明' : '用户');
 const SOURCE = process.env.MEMORY_SOURCE || '以前和 AI 的对话';
 const FIX_HOW = process.env.MEMORY_FIX_HOW || '找 Javis 的管理员，把它加进「不给 Bot 看」的名单';
 const HIDDEN_LINE = `（这一条已按${OWNER}的要求不再显示）`;
@@ -149,8 +152,8 @@ function readText(file) {
 
 // The Bot profile (or Javis's .env.mcp): which accounts this Bot may see, and where the token is.
 function profile() {
-  if (!TOKEN_FILE) throw new UserError('没有配置 JAVIS_TOKEN_FILE（这个 Bot 的 Javis 设置，或 Javis 的 .env.mcp）。');
-  const text = readText(TOKEN_FILE);
+  if (!TOKEN_FILE && !DEMO) throw new UserError('没有配置 JAVIS_TOKEN_FILE（这个 Bot 的 Javis 设置，或 Javis 的 .env.mcp）。');
+  const text = TOKEN_FILE ? readText(TOKEN_FILE) : '';
   const from = lineValue(text, 'JAVIS_TOKEN_FROM');
   const listed = process.env.JAVIS_SOURCES != null && process.env.JAVIS_SOURCES.trim() !== ''
     ? process.env.JAVIS_SOURCES : lineValue(text, 'JAVIS_SOURCES');
@@ -186,6 +189,7 @@ const javis = (name, args, timeoutMs) => rpc('tools/call', { name, arguments: ar
 
 // One JSON-RPC request to Javis's MCP endpoint, with this Bot's token. HTTP refusals carry their status.
 function rpc(method, params, timeoutMs) {
+  if (DEMO) return Promise.resolve().then(() => require('./demo.js').javis(method, params));
   return new Promise((resolve, reject) => {
     const body = Buffer.from(JSON.stringify({ jsonrpc: '2.0', id: nextId++, method, params }), 'utf8');
     const req = http.request({
@@ -623,7 +627,8 @@ async function getConversation(args) {
 // and can the hide list be read (an unreadable one stops every query). It reads no memory: it asks Javis for its tool
 // list. The answer carries no token and no memory text.
 async function status() {
-  const out = { store: 'javis', url: `${ENDPOINT.origin}${ENDPOINT.pathname}` };
+  const out = { store: 'javis', url: DEMO ? 'demo' : `${ENDPOINT.origin}${ENDPOINT.pathname}` };
+  if (DEMO) return { ...out, state: 'demo', detail: '这些都是虚构的示例，不是谁的真实记忆' };
   try {
     out.hide_list = fs.existsSync(HIDE_FILE) ? 'ok' : 'none';
     hidden();
@@ -731,7 +736,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  VERSION, GUIDE, RAW_NOTE, MAX_TEXT, HIDDEN_LINE, UserError, FOR_CC, OWNER, FIX_HOW,
+  VERSION, DEMO, GUIDE, RAW_NOTE, MAX_TEXT, HIDDEN_LINE, UserError, FOR_CC, OWNER, FIX_HOW,
   clip, day, when, session, matchSession, fit, droppedNote, factLine, relationLine, intIn,
   searchFacts, entityFacts, findMatches, searchMemory, getEntity, findSessions, getConversation, status,
 };

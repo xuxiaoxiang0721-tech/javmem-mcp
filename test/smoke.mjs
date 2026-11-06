@@ -159,4 +159,47 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   ok('javmem/status: ok, bad token, down, no token, for each store; no token in the answer');
 }
 
+// The demo backend (MEMV2_URL=demo, JAVIS_URL=demo): all thirteen tools answer from the made-up data, with no token
+// and nothing running; cross-check marks, the dropped made-up fact and the per-Bot filters work as with real stores.
+{
+  const demo = { MEMV2_URL: 'demo', JAVIS_URL: 'demo', MEMV2_TOKEN_FILE: '', JAVIS_TOKEN_FILE: '', MEMORY_OWNER: '' };
+  const call = (name, args) => ({ method: 'tools/call', params: { name, arguments: args } });
+  // Answers come back in the order they finish; put them in request order.
+  const all = (m) => [...m.keys()].filter((id) => id > 0).sort((a, b) => a - b).map((id) => m.get(id).result);
+  const combined = all(await session('memory-mcp.js', demo, [{},
+    call('recall', { query: '小雨的游泳课' }), call('search', { query: '游泳课 学费' }), call('search_raw', { query: '千岛湖' }),
+    call('person', { name: '老陈' }), call('read', { record_key: 'demo-s1-5' }), call('read', { session_id: 'demo-s3' }),
+    { method: 'javmem/status', params: {} }]));
+  combined.slice(0, 6).forEach((r) => assert.notEqual(r.isError, true));
+  const [recall, search, raw, person, record, conversation, status] = combined.map((r, i) => (i === 6 ? r : text(r)));
+  assert.match(recall, /小雨每周三下午上游泳课，教练姓周 \(shared\)（图库也有）/);
+  assert.match(search, /2400 元.*（图库说法不同，以这条为准）\n   图库说：小明给小雨报了 3 个月游泳课，学费 2600 元/);
+  assert.match(search, /另有 1 条和原文对不上，没列出。/);
+  assert.match(raw, /记录号：demo-s2-1  《十一月去千岛湖》（chatgpt，对话号 demo-s2）/);
+  assert.match(person, /小明和老陈 2025 年一起去成都出过差.*（未细核）（只在图库）/);
+  assert.match(person, /老陈 12 月起调到深圳分公司，仓储系统交接给小明 \(work\)/);
+  assert.match(record, /"text": "刚给小雨交了三个月的游泳课学费，2400 元。"/);
+  assert.match(conversation, /《老陈调岗》（grok，对话号 demo-s3）[\s\S]*已读完。/);
+  assert.deepEqual(status.stores.map((s) => `${s.store}:${s.state}`), ['memv2:demo', 'javis:demo']);
+  assert.equal(status.labels, 'ok');
+  const single = [
+    ...all(await session('memv2-mcp.js', demo, [{}, call('recall', { query: '芒果' }), call('search', { query: '', entity: '老陈' }),
+      call('search_raw', { query: '2400' }), call('read_record', { record_key: 'demo-s4-1' })])),
+    ...all(await session('javis-mcp.js', demo, [{}, call('search_memory', { query: '游泳课' }), call('get_entity', { entity_uuid: 'demo-e-laochen' }),
+      call('find_sessions', { query: '千岛湖' }), call('get_conversation', { session_id: 'demo-s1', offset: 4 })])),
+  ];
+  single.forEach((r) => assert.notEqual(r.isError, true));
+  assert.match(text(single[0]), /小明对芒果过敏/);
+  assert.match(text(single[4]), /小雨每周三下午跟周教练上游泳课/);
+  assert.ok(!/2019/.test(text(single[4])), 'the made-up fact that the source does not back is dropped');
+  // Per-Bot filters on the demo data: a namespace, and a Javis account list.
+  const work = all(await session('memv2-mcp.js', { ...demo, MEMV2_NAMESPACE: 'work', MEMV2_BOT_ONLY: '1' }, [{}, call('recall', { query: '小雨 老陈 芒果' })]));
+  assert.match(text(work[0]), /老陈/);
+  assert.ok(!/小雨|芒果/.test(text(work[0])), 'a namespace sees only its own facts');
+  const gpt = all(await session('javis-mcp.js', { ...demo, JAVIS_SOURCES: 'chatgpt' }, [{}, call('find_sessions', { query: '游泳课' })]));
+  assert.match(text(gpt[0]), /对话号 demo-s2/);
+  assert.ok(!/demo-s1/.test(text(gpt[0])), 'an account list hides the other accounts');
+  ok('demo backend: thirteen tools on made-up data, marks, the dropped fact, per-Bot filters');
+}
+
 console.log(`${passed} checks passed`);

@@ -1,0 +1,385 @@
+{
+ "note": "Made-up demo data for MEMV2_URL=demo and JAVIS_URL=demo. Every person, company and conversation here is fictional.",
+ "sessions": [
+  {
+   "id": "demo-s1",
+   "title": "小雨的游泳课",
+   "provider": "grok",
+   "namespace": "shared",
+   "messages": [
+    {
+     "role": "user",
+     "timestamp": "2026-08-30T20:11:00+08:00",
+     "content": "小雨的游泳课定在每周二下午，帮我记一下。"
+    },
+    {
+     "role": "assistant",
+     "timestamp": "2026-08-30T20:11:30+08:00",
+     "content": "好的，记下了：小雨的游泳课在每周二下午。"
+    },
+    {
+     "role": "user",
+     "timestamp": "2026-09-14T19:02:00+08:00",
+     "content": "游泳课改到每周三下午了，教练姓周，人很耐心。"
+    },
+    {
+     "role": "assistant",
+     "timestamp": "2026-09-14T19:03:00+08:00",
+     "content": "明白，小雨现在每周三下午跟周教练上游泳课。"
+    },
+    {
+     "role": "user",
+     "timestamp": "2026-10-02T21:30:00+08:00",
+     "content": "刚给小雨交了三个月的游泳课学费，2400 元。"
+    },
+    {
+     "role": "assistant",
+     "timestamp": "2026-10-02T21:30:40+08:00",
+     "content": "记下了：10 月 2 日交了 3 个月游泳课学费，2400 元。"
+    }
+   ]
+  },
+  {
+   "id": "demo-s2",
+   "title": "十一月去千岛湖",
+   "provider": "chatgpt",
+   "namespace": "shared",
+   "messages": [
+    {
+     "role": "user",
+     "timestamp": "2026-10-20T12:05:00+08:00",
+     "content": "11 月 15 日想带家人去千岛湖，住两晚，帮我想想怎么安排。"
+    },
+    {
+     "role": "assistant",
+     "timestamp": "2026-10-20T12:06:00+08:00",
+     "content": "11 月中旬千岛湖不冷不热，第一天下午到、坐船游湖，第二天骑行环湖，第三天上午回。湖边的酒店建议提前订。"
+    },
+    {
+     "role": "user",
+     "timestamp": "2026-10-21T08:40:00+08:00",
+     "content": "游泳课那边我记得一共交了 2600 吧，你帮我想想要不要续。"
+    },
+    {
+     "role": "assistant",
+     "timestamp": "2026-10-21T08:41:00+08:00",
+     "content": "按你说的 2600 元三个月算，一节课大约两百元。如果小雨喜欢，可以先续一个月看看。"
+    }
+   ]
+  },
+  {
+   "id": "demo-s3",
+   "title": "老陈调岗",
+   "provider": "grok",
+   "namespace": "work",
+   "messages": [
+    {
+     "role": "user",
+     "timestamp": "2026-08-20T09:15:00+08:00",
+     "content": "我在云帆物流做产品经理，仓储系统是老陈负责的。"
+    },
+    {
+     "role": "assistant",
+     "timestamp": "2026-08-20T09:16:00+08:00",
+     "content": "了解，你和老陈是云帆物流的同事，他负责仓储系统。"
+    },
+    {
+     "role": "user",
+     "timestamp": "2026-10-25T18:20:00+08:00",
+     "content": "老陈说他 12 月调去深圳分公司了，仓储系统要交接给我。"
+    },
+    {
+     "role": "assistant",
+     "timestamp": "2026-10-25T18:21:00+08:00",
+     "content": "记下了：老陈 12 月起调到深圳分公司，仓储系统交接给你。"
+    },
+    {
+     "role": "user",
+     "timestamp": "2026-10-25T18:23:00+08:00",
+     "content": "去年我们俩还一起去成都出过差。"
+    },
+    {
+     "role": "assistant",
+     "timestamp": "2026-10-25T18:23:30+08:00",
+     "content": "好的，你和老陈 2025 年一起去成都出过差。"
+    }
+   ]
+  },
+  {
+   "id": "demo-s4",
+   "title": "体检报告",
+   "provider": "health-assistant",
+   "namespace": "life",
+   "messages": [
+    {
+     "role": "user",
+     "timestamp": "2026-07-11T10:02:00+08:00",
+     "content": "我对芒果过敏，吃了会起疹子，以后推荐水果别算芒果。"
+    },
+    {
+     "role": "assistant",
+     "timestamp": "2026-07-11T10:02:30+08:00",
+     "content": "记住了：你对芒果过敏，推荐水果时不会再算芒果。"
+    }
+   ]
+  }
+ ],
+ "memv2": {
+  "records_from": "every message of the sessions above, keyed <session id>-<message number>",
+  "items": [
+   {
+    "item_id": "demo-m1",
+    "fact": "小雨每周三下午上游泳课，教练姓周",
+    "date": "2026-09-14",
+    "namespace": "shared",
+    "status": "active",
+    "record": "demo-s1-3"
+   },
+   {
+    "item_id": "demo-m5",
+    "fact": "小雨的游泳课在每周二下午",
+    "date": "2026-08-30",
+    "namespace": "shared",
+    "status": "superseded",
+    "record": "demo-s1-1"
+   },
+   {
+    "item_id": "demo-m2",
+    "fact": "10 月 2 日给小雨交了 3 个月游泳课学费 2400 元",
+    "date": "2026-10-02",
+    "namespace": "shared",
+    "status": "active",
+    "record": "demo-s1-5"
+   },
+   {
+    "item_id": "demo-m3",
+    "fact": "小明在云帆物流做产品经理，同事老陈负责仓储系统",
+    "date": "2026-08-20",
+    "namespace": "work",
+    "status": "active",
+    "record": "demo-s3-1"
+   },
+   {
+    "item_id": "demo-m6",
+    "fact": "老陈 12 月起调到深圳分公司，仓储系统交接给小明",
+    "date": "2026-10-25",
+    "namespace": "work",
+    "status": "active",
+    "record": "demo-s3-3"
+   },
+   {
+    "item_id": "demo-m4",
+    "fact": "计划 11 月 15 日带家人去千岛湖，住两晚",
+    "date": "2026-10-20",
+    "namespace": "shared",
+    "status": "active",
+    "record": "demo-s2-1"
+   },
+   {
+    "item_id": "demo-m7",
+    "fact": "小明对芒果过敏，吃了会起疹子",
+    "date": "2026-07-11",
+    "namespace": "life",
+    "status": "active",
+    "record": "demo-s4-1"
+   }
+  ]
+ },
+ "javis": {
+  "entities": [
+   {
+    "uuid": "demo-e-xiaoming",
+    "name": "小明",
+    "summary": "云帆物流的产品经理，女儿叫小雨。"
+   },
+   {
+    "uuid": "demo-e-xiaoyu",
+    "name": "小雨",
+    "summary": "小明的女儿，每周三下午跟周教练上游泳课。"
+   },
+   {
+    "uuid": "demo-e-zhou",
+    "name": "周教练",
+    "summary": "小雨的游泳教练，人很耐心。"
+   },
+   {
+    "uuid": "demo-e-swim",
+    "name": "游泳课",
+    "summary": "小雨上的游泳课。"
+   },
+   {
+    "uuid": "demo-e-laochen",
+    "name": "老陈",
+    "summary": "小明在云帆物流的同事，负责仓储系统，12 月起调到深圳分公司。"
+   },
+   {
+    "uuid": "demo-e-yunfan",
+    "name": "云帆物流",
+    "summary": "小明工作的物流公司。"
+   },
+   {
+    "uuid": "demo-e-shenzhen",
+    "name": "深圳分公司",
+    "summary": "云帆物流在深圳的分公司。"
+   },
+   {
+    "uuid": "demo-e-qiandao",
+    "name": "千岛湖",
+    "summary": "小明一家 11 月想去的地方。"
+   }
+  ],
+  "episodes": [
+   {
+    "uuid": "demo-ep1",
+    "session": "demo-s1",
+    "messages": [
+     1,
+     2,
+     3,
+     4
+    ],
+    "valid_at": "2026-09-14T19:03:00+08:00"
+   },
+   {
+    "uuid": "demo-ep2",
+    "session": "demo-s1",
+    "messages": [
+     5,
+     6
+    ],
+    "valid_at": "2026-10-02T21:30:40+08:00"
+   },
+   {
+    "uuid": "demo-ep3",
+    "session": "demo-s3",
+    "messages": [
+     1,
+     2
+    ],
+    "valid_at": "2026-08-20T09:16:00+08:00"
+   },
+   {
+    "uuid": "demo-ep4",
+    "session": "demo-s2",
+    "messages": [
+     3,
+     4
+    ],
+    "valid_at": "2026-10-21T08:41:00+08:00"
+   },
+   {
+    "uuid": "demo-ep5",
+    "session": "demo-s3",
+    "messages": [
+     3,
+     4,
+     5,
+     6
+    ],
+    "valid_at": "2026-10-25T18:23:30+08:00"
+   },
+   {
+    "uuid": "demo-ep6",
+    "session": "demo-s2",
+    "messages": [
+     1,
+     2
+    ],
+    "valid_at": "2026-10-20T12:06:00+08:00"
+   }
+  ],
+  "facts": [
+   {
+    "uuid": "demo-j1",
+    "fact": "小雨每周三下午跟周教练上游泳课",
+    "source": "demo-e-xiaoyu",
+    "target": "demo-e-zhou",
+    "valid_at": "2026-09-14T19:03:00+08:00",
+    "episodes": [
+     "demo-ep1"
+    ]
+   },
+   {
+    "uuid": "demo-j8",
+    "fact": "小雨的游泳课在每周二下午",
+    "source": "demo-e-xiaoyu",
+    "target": "demo-e-swim",
+    "valid_at": "2026-08-30T20:11:30+08:00",
+    "invalid_at": "2026-09-14T19:03:00+08:00",
+    "episodes": [
+     "demo-ep1"
+    ]
+   },
+   {
+    "uuid": "demo-j7",
+    "fact": "小雨 2019 年拿过游泳比赛冠军",
+    "source": "demo-e-xiaoyu",
+    "target": "demo-e-swim",
+    "valid_at": "2026-09-14T19:03:00+08:00",
+    "episodes": [
+     "demo-ep1"
+    ]
+   },
+   {
+    "uuid": "demo-j2",
+    "fact": "小明给小雨报了 3 个月游泳课，学费 2600 元",
+    "source": "demo-e-xiaoming",
+    "target": "demo-e-xiaoyu",
+    "valid_at": "2026-10-21T08:41:00+08:00",
+    "episodes": [
+     "demo-ep4"
+    ]
+   },
+   {
+    "uuid": "demo-j3",
+    "fact": "老陈和小明是云帆物流的同事，老陈负责仓储系统",
+    "source": "demo-e-laochen",
+    "target": "demo-e-xiaoming",
+    "valid_at": "2026-08-20T09:16:00+08:00",
+    "episodes": [
+     "demo-ep3"
+    ]
+   },
+   {
+    "uuid": "demo-j5",
+    "fact": "小明在云帆物流做产品经理",
+    "source": "demo-e-xiaoming",
+    "target": "demo-e-yunfan",
+    "valid_at": "2026-08-20T09:16:00+08:00",
+    "episodes": [
+     "demo-ep3"
+    ]
+   },
+   {
+    "uuid": "demo-j4",
+    "fact": "老陈 12 月起调到深圳分公司",
+    "source": "demo-e-laochen",
+    "target": "demo-e-shenzhen",
+    "valid_at": "2026-10-25T18:21:00+08:00",
+    "episodes": [
+     "demo-ep5"
+    ]
+   },
+   {
+    "uuid": "demo-j6",
+    "fact": "小明和老陈 2025 年一起去成都出过差",
+    "source": "demo-e-xiaoming",
+    "target": "demo-e-laochen",
+    "valid_at": "2026-10-25T18:23:30+08:00",
+    "episodes": [
+     "demo-ep5"
+    ]
+   },
+   {
+    "uuid": "demo-j9",
+    "fact": "小明计划 11 月 15 日带家人去千岛湖",
+    "source": "demo-e-xiaoming",
+    "target": "demo-e-qiandao",
+    "valid_at": "2026-10-20T12:06:00+08:00",
+    "episodes": [
+     "demo-ep6"
+    ]
+   }
+  ]
+ }
+}
