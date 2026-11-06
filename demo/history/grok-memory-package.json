@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.2",
+  "package_id": "demo-grok-pkg-0002",
+  "synthetic": true,
+  "packaged_at": "2026-10-28T12:00:00Z",
+  "source": { "source_tool": "grok_bot", "exported_by": "demo", "session_id": "demo-grok-session" },
+  "coverage": { "description": "made-up demo package", "window_start": "2026-10-28T10:00:00Z", "window_end": "2026-10-28T11:00:00Z", "completeness": "complete", "content_types": ["message"], "gaps": [] },
+  "raw_records": [
+    { "record_id": "r1", "sequence": 1, "role": "user", "content_type": "message", "content_kind": "original", "text": "体检报告出来了，医生说我要少吃甜的，每周跑三次步。", "occurred_at": "2026-10-28T10:00:00Z", "operation": "append" },
+    { "record_id": "r2", "sequence": 2, "role": "assistant", "content_type": "message", "content_kind": "original", "text": "记下了：少吃甜食，每周跑步三次。周末早上去西湖边跑正好。", "occurred_at": "2026-10-28T10:00:30Z", "operation": "append" },
+    { "record_id": "r3", "sequence": 3, "role": "system", "content_type": "message", "content_kind": "original", "text": "系统消息，不该被记下", "occurred_at": "2026-10-28T10:01:00Z", "operation": "append" }
+  ],
+  "summaries": [],
+  "fact_candidates": [],
+  "attachments": [],
+  "redactions": [],
+  "continuity": { "stream_id": "demo-grok-stream", "previous_package_id": "demo-grok-pkg-0001", "mode": "supplement" }
+}

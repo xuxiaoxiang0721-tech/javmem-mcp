@@ -63,7 +63,8 @@ function segments(rows, o = {}) {
   }
   const out = [];
   for (const list of bySession.values()) {
-    const inherited = String(list[0].origin || '').startsWith('inherited:');
+    // An inherited package or an imported export is complete as it is: no live end waits for more.
+    const inherited = /^(inherited|history):/.test(String(list[0].origin || ''));
     let cur = [];
     let chars = 0;
     const flush = () => {

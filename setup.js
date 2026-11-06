@@ -60,14 +60,17 @@ function storeFor(target) {
   if (/\.sqlite$/i.test(target) && fs.existsSync(target)) return { store: new LocalStore(target, { readonly: true }), packages: 0 };
   const store = new LocalStore(':memory:');
   const files = fs.statSync(target).isDirectory()
-    ? fs.readdirSync(target).filter((f) => /\.(json|txt|md)$/i.test(f)).map((f) => path.join(target, f))
+    ? fs.readdirSync(target).filter((f) => /\.(json|jsonl|txt|md)$/i.test(f)).map((f) => path.join(target, f))
     : [target];
   let packages = 0;
+  const history = require('./history.js');
   for (const f of files) {
     try {
+      // An export of original conversations (ChatGPT, Claude, ...) first, else a javmem package.
+      if (history.importExport(store, f)) continue;
       const r = importPackage(store, fs.readFileSync(f, 'utf8'));
       if (r.added) packages += 1;
-    } catch { /* not a package */ }
+    } catch { /* neither */ }
   }
   return { store, packages };
 }

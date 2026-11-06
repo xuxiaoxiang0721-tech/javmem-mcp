@@ -30,6 +30,7 @@
     "local-store.js",
     "local-mcp.js",
     "inherit.js",
+    "history.js",
     "graphiti.js",
     "feed.js",
     "memv2-lite.js",

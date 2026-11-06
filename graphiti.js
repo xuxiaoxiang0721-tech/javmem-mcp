@@ -180,7 +180,9 @@ function episodeId(group, session, from, to) {
 /** What a conversation's source is called in tool results: its own conversations, or the tool it was inherited from. */
 function provider(origin) {
   const o = String(origin || '');
-  return o.startsWith('inherited:') ? `继承自 ${o.slice('inherited:'.length)}` : '对话';
+  if (o.startsWith('inherited:')) return `继承自 ${o.slice('inherited:'.length)}`;
+  if (o.startsWith('history:')) return `导入自 ${o.slice('history:'.length)}`;
+  return '对话';
 }
 
 const factOf = (e) => ({

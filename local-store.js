@@ -301,6 +301,9 @@ class LocalStore {
       messages: one("SELECT COUNT(*) AS n FROM messages WHERE origin = 'session'"),
       inheritedPackages: one("SELECT COUNT(*) AS n FROM sessions WHERE origin LIKE 'inherited:%'"),
       inherited: one("SELECT COUNT(*) AS n FROM messages WHERE origin LIKE 'inherited:%'"),
+      // Original conversations imported from other tools (history.js).
+      historySessions: one("SELECT COUNT(*) AS n FROM sessions WHERE origin LIKE 'history:%'"),
+      history: one("SELECT COUNT(*) AS n FROM messages WHERE origin LIKE 'history:%'"),
       updated: this.meta('updated') || null,
     };
   }

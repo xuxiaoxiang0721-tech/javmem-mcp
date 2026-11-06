@@ -180,7 +180,28 @@ function main(argv) {
       store.close();
     }
   }
-  process.stderr.write('usage: javmem-inherit prompt [--en] | check <package> | import <package> --db <store> [--tool <name>]\n');
+  // history: original conversations exported from other tools (ChatGPT, Claude, Claude Code, Codex, 1.2 packages),
+  // a file or a folder of them; without --db it only counts, with --db it imports. Counts only, never the text.
+  if (cmd === 'history' && file) {
+    const history = require('./history.js');
+    const db = flag('--db');
+    if (!db) {
+      const r = history.checkPath(file);
+      process.stdout.write(`${JSON.stringify(r)}\n`);
+      return r.files ? 0 : 1;
+    }
+    const { LocalStore } = require('./local-store.js');
+    const store = new LocalStore(db);
+    try {
+      const r = history.importPath(store, file);
+      process.stdout.write(`${JSON.stringify(r)}\n`);
+      return r.files ? 0 : 1;
+    } finally {
+      store.close();
+    }
+  }
+  process.stderr.write('usage: javmem-inherit prompt [--en] | check <package> | import <package> --db <store> [--tool <name>]\n'
+    + '       javmem-inherit history <export file or folder> [--db <store>]   (ChatGPT, Claude, Claude Code, Codex, memory packages 1.2)\n');
   return 2;
 }
 

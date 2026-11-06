@@ -13,7 +13,7 @@ This memory is called javmem: memv2 keeps facts (who, when, how much), Javis kee
 ## Why javmem
 
 1. **Built for personal Bots, so it can afford good models.** One person's conversations are nowhere near commercial data volumes, so javmem doesn't skimp on the model that extracts memory: the same person has to be recognised as the same person, relations linked correctly and events put in order, and the better the model, the more accurate it gets. You see the cost before you install, and a daily cap keeps a big history import from running up the bill. If you'd rather pay nothing, zero-setup mode costs nothing at all.
-2. **Bring your past in one go.** Most memory plugins start remembering on the day you install them. javmem comes with an export prompt: paste it into a tool like Grok, ChatGPT or Claude, and it writes what it remembers and the topics you talked about into one package, imported in one go.
+2. **Bring your past in one go.** Most memory plugins start remembering on the day you install them. javmem comes with an importer that parses the history exported from tools like Grok, ChatGPT and Claude and loads it in one pass. What goes in is the original conversation, not a few things an AI recalls about you; people, things, times and places are all in the original words, which is what lets them be linked into a web. For a tool that can't export its history, an export prompt lets the AI write down what it remembers.
 3. **Two stores, each with its own job: the more it holds, the more it resembles a real person.** With the full backend, memv2 keeps what is true: facts, numbers, dates. The graph keeps who, when, where, and how things changed later. The original words are kept too, down to how someone phrases things. Outdated statements are marked as no longer valid, so it can tell what you thought then from what you think now, and where the two stores disagree it says so. The more memory builds up, the more faithfully it can reconstruct a real person: groundwork for a digital human.
 4. **Read-only, so a Bot can't rewrite your past.** Memory has only two ways in, both outside the model's hands: the Bot program itself packages new conversations and delivers them to the store, and you import your own history; the model can look things up but never write, so it can't slip a guess of its own into memory, and instructions smuggled in by a web page or another Bot can't make it delete or change what is remembered.
 
@@ -161,6 +161,29 @@ What another AI tool (Grok, Muse, Dot, ChatGPT and the like) remembers about you
 5. Every item is marked 「继承自 Grok」 (inherited from Grok) with the export date; the same file imported again adds nothing.
 
 Inherited memory was never checked against the original conversations, and the tool text tells the model to name where it came from.
+
+## Bring past conversations in one go: javmem-inherit history
+
+When another AI tool can export its conversations, import the export straight into the local store instead of asking an AI to recall them. What goes in are the original words: who said what, when, about whom. With the fact store or the graph as backend they are extracted like the Bot's own conversations, so people, things, times and places link up.
+
+| Tool | Export file |
+|---|---|
+| ChatGPT | `conversations.json` from the data export in its settings (each conversation's final branch) |
+| Claude | `conversations.json` from the data export in its settings |
+| Claude Code | `~/.claude/projects/<project>/<session>.jsonl`, or the whole folder |
+| Codex | `rollout-*.jsonl` under `~/.codex/sessions/`, or the whole folder |
+| memory packages of Bots such as Grok | `memory-package.json`, schema 1.2 (`raw_records`) |
+
+```bash
+npx -y -p javmem-mcp javmem-inherit history ~/Downloads/conversations.json            # how much would go in (counts only)
+npx -y -p javmem-mcp javmem-inherit history ~/Downloads/conversations.json --db me.sqlite
+npx -y javmem-mcp estimate ~/Downloads/conversations.json                              # what extracting it would cost
+```
+
+- Only what people typed and the AI answered goes in; tool calls and results, system messages, injected context, side tasks and branches left behind stay out.
+- One session per conversation (`history:<tool>:<id>`), marked "导入自 <tool>" (imported from); the same export again adds nothing, a longer one adds only the new messages.
+- With the DSH plugin, put the export in `<DSH home>/javmem/inherit/<Bot name or id>/` next to inherited packages; the next pass takes it into that Bot's local store.
+- For a large history, `estimate` first: the fact store asks the model per stretch within a daily limit, so a big import does not spend a day's budget at once.
 
 ## The graph on the official Graphiti server (backend C)
 

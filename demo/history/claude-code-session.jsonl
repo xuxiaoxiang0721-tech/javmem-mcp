@@ -1,0 +1,7 @@
+{"type":"summary","summary":"整理家庭记账表","leafUuid":"x1"}
+{"type":"user","sessionId":"demo-cc-0001","timestamp":"2026-10-24T09:00:00.000Z","message":{"role":"user","content":"<command-name>/clear</command-name>"},"isMeta":true}
+{"type":"user","sessionId":"demo-cc-0001","timestamp":"2026-10-24T09:01:00.000Z","message":{"role":"user","content":"帮我把十月的家庭记账表整理一下，游泳课学费单独记一列。"}}
+{"type":"assistant","sessionId":"demo-cc-0001","timestamp":"2026-10-24T09:01:30.000Z","message":{"role":"assistant","content":[{"type":"text","text":"好的，我把游泳课学费单独列成一列，十月这一项是 2400 元。"},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"budget.csv"}}]}}
+{"type":"user","sessionId":"demo-cc-0001","timestamp":"2026-10-24T09:01:40.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"工具结果，不该被记下"}]}}
+{"type":"assistant","sessionId":"demo-cc-0001","timestamp":"2026-10-24T09:02:00.000Z","isSidechain":true,"message":{"role":"assistant","content":[{"type":"text","text":"子任务里的话，不该被记下"}]}}
+{"type":"user","sessionId":"demo-cc-0001","timestamp":"2026-10-24T09:03:00.000Z","message":{"role":"user","content":[{"type":"text","text":"再加一列千岛湖的旅行预算，先写 3000。"}]}}

@@ -1,0 +1,18 @@
+[
+  {
+    "title": "游泳课续费",
+    "create_time": 1761030000.0,
+    "update_time": 1761031000.0,
+    "conversation_id": "demo-chatgpt-0001",
+    "current_node": "n5",
+    "mapping": {
+      "n0": { "id": "n0", "message": null, "parent": null, "children": ["n1"] },
+      "n1": { "id": "n1", "parent": "n0", "children": ["n2", "n2b"], "message": { "id": "n1", "author": { "role": "system" }, "create_time": 1761030000.0, "content": { "content_type": "text", "parts": [""] }, "metadata": { "is_visually_hidden_from_conversation": true } } },
+      "n2b": { "id": "n2b", "parent": "n1", "children": [], "message": { "id": "n2b", "author": { "role": "user" }, "create_time": 1761030050.0, "content": { "content_type": "text", "parts": ["（改写前的一版，不在最后那条分支上）"] }, "metadata": {} } },
+      "n2": { "id": "n2", "parent": "n1", "children": ["n3"], "message": { "id": "n2", "author": { "role": "user" }, "create_time": 1761030060.0, "content": { "content_type": "text", "parts": ["小雨的游泳课下个月要续费了，周教练说这期是 12 节课。"] }, "metadata": {} } },
+      "n3": { "id": "n3", "parent": "n2", "children": ["n4"], "message": { "id": "n3", "author": { "role": "assistant" }, "create_time": 1761030070.0, "content": { "content_type": "text", "parts": ["好的。12 节课的话，按上一期的价格大约要准备两千多元，可以先问周教练有没有续费优惠。"] }, "metadata": {} } },
+      "n4": { "id": "n4", "parent": "n3", "children": ["n5"], "message": { "id": "n4", "author": { "role": "tool" }, "create_time": 1761030080.0, "content": { "content_type": "text", "parts": ["工具的输出，不该被记下"] }, "metadata": {} } },
+      "n5": { "id": "n5", "parent": "n4", "children": [], "message": { "id": "n5", "author": { "role": "user" }, "create_time": 1761030090.0, "content": { "content_type": "multimodal_text", "parts": [{ "content_type": "image_asset_pointer", "asset_pointer": "file-demo" }, "这是缴费单的照片，周三下午去交。"] }, "metadata": {} } }
+    }
+  }
+]

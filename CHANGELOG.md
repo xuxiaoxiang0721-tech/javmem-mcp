@@ -1,5 +1,13 @@
 # 更新记录 / Changelog
 
+## 0.4.0（未发布 / unreleased）
+
+- 过去的对话一次带进来：`history.js`（`javmem-inherit history <文件或文件夹> [--db <本地库>]`）读 ChatGPT、Claude 的 `conversations.json`，Claude Code、Codex 的会话记录和 1.2 版记忆包，只收人和 AI 说的话，每段对话一个会话、标「导入自 某工具」，同一个导出不重复；`estimate` 也认这些文件；附五种格式的虚构样例（`demo/history/`）。README 的「为什么是 javmem」第 2 条补全。
+
+English:
+
+- Past conversations in one go: `history.js` (`javmem-inherit history <file or folder> [--db <local store>]`) reads ChatGPT's and Claude's `conversations.json`, Claude Code's and Codex's session logs and 1.2 memory packages, keeps only what people and the AI said, one session per conversation marked as imported from that tool, each export once; `estimate` reads them too; made-up samples of the five formats in `demo/history/`. Point 2 of "Why javmem" in full.
+
 ## 0.3.0（2026-11-06）
 
 - 三个服务在 MCP 握手里报的版本号，改成读同目录的 `package.json`（以前写死，`memory-mcp.js` 还报 0.1.0）。

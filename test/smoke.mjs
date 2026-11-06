@@ -513,6 +513,41 @@ else {
   ok('setup wizard: four choices with their cost, the quote first, nothing on a no, each backend\'s files; estimate counts only');
 }
 
+// javmem-inherit history (item 20): made-up exports of five tools; only what people typed and the AI answered goes in
+// (no branch left behind, tool output, injected context, side task or system text); once each; shown as
+// imported from that tool; whole conversations, so the feeder sends them without waiting.
+if (!SQLITE) skip('history import');
+else {
+  const { spawnSync } = await import('node:child_process');
+  const req = (await import('node:module')).createRequire(import.meta.url);
+  const { segments } = req('../feed.js');
+  const { LocalStore } = req('../local-store.js');
+  const cli = (...args) => spawnSync(process.execPath, [join(root, 'inherit.js'), ...args], { encoding: 'utf8', timeout: 30000 });
+  const dir = join(root, 'demo', 'history');
+  const checked = JSON.parse(cli('history', dir).stdout);
+  assert.deepEqual(Object.fromEntries(Object.entries(checked.byTool).map(([k, v]) => [k, [v.format, v.conversations, v.messages]])), {
+    ChatGPT: ['chatgpt', 1, 3], Claude: ['claude', 1, 3], 'Claude Code': ['claude-code', 1, 3], Codex: ['codex', 1, 2], Grok: ['grok12', 1, 2] });
+  const db = join(scratch, 'history.sqlite');
+  const first = JSON.parse(cli('history', dir, '--db', db).stdout);
+  assert.equal(Object.values(first.byTool).reduce((n, t) => n + t.added, 0), 13);
+  assert.equal(Object.values(JSON.parse(cli('history', dir, '--db', db).stdout).byTool).reduce((n, t) => n + t.added, 0), 0, 'once');
+  const s = new LocalStore(db, { readonly: true });
+  const all = s.rows('SELECT text FROM messages').map((r) => r.text).join('\n');
+  s.close();
+  assert.ok(!/不该被记下|不在最后那条分支上/.test(all), 'tool output, injected context, side tasks, system text and dropped branches stay out');
+  const call = (name, args) => ({ method: 'tools/call', params: { name, arguments: args } });
+  const a = await session('local-mcp.js', { JAVMEM_LOCAL_DB: db, MEMORY_OWNER: '小明' }, [{},
+    call('search', { query: '出库脚本' }), call('search_raw', { query: '湖景房' }), { method: 'javmem/status', params: {} }]);
+  assert.match(text(a.get(1).result), /\[2026-10-26\] 小明：老陈下个月调去深圳，仓储系统的出库脚本要交接给我[\s\S]*（《老陈下个月调去深圳[^》]*》，导入自 Codex，消息号 m\d+）/);
+  assert.match(text(a.get(2).result), /小明：11 月 15 日去千岛湖，老婆想住湖景房[\s\S]*导入自 Claude/);
+  assert.match(a.get(3).result.stores[0].detail, /；导入的历史 5 段对话、13 条；/);
+  const s2 = new LocalStore(db, { readonly: true });
+  const segs = segments(s2.unfed('graphiti', 'x'), { now: Date.parse('2026-10-28T10:01:00Z') });
+  s2.close();
+  assert.equal(segs.reduce((n, g) => n + g.length, 0), 13, 'imported conversations are complete: nothing waits for more');
+  ok('history import: ChatGPT, Claude, Claude Code, Codex, 1.2 packages; only the words people and the AI said; once; marked; ready to feed');
+}
+
 // scripts/eval.mjs on the demo questions: the counts it prints, and nothing but counts.
 {
   const { spawnSync } = await import('node:child_process');
