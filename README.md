@@ -1,6 +1,17 @@
 # javmem-mcp
 
-两个只读的 MCP 服务，给聊天 Bot（以及 Claude Code）查记忆用：
+给聊天 Bot（以及 Claude Code）查记忆用的只读 MCP 服务：一个把两个记忆库合起来的工具，和它用到的两个单库服务。两个库是 memv2（事实记忆）和 Javis（Graphiti + Neo4j 的记忆图谱），本仓库不含这两个库本身，要你自己先装好。
+
+配套的 DeepSeek Harness（Tobs）插件：[javmem-dsh-plugin](https://github.com/xuxiaoxiang0721-tech/javmem-dsh-plugin)，按 Bot 自动挂上这些工具，不用给每个 Bot 单独接私有 MCP。
+
+## 快速开始
+
+1. 准备：Node 20 以上；memv2 的 HTTP 读接口（默认 `http://127.0.0.1:8766`）和每个 Bot 的只读客户端令牌文件；Javis 的 MCP 端点（默认 `http://127.0.0.1:8765/mcp`）和存它令牌的文件。
+2. 下载：`git clone https://github.com/xuxiaoxiang0721-tech/javmem-mcp.git`（没有依赖，不用 `npm install`）。
+3. 自测：`node test/smoke.mjs`，不需要两个库在跑。
+4. 接上：在 Claude Code 的 `.mcp.json` 或你的 Bot 平台里加一个 stdio 服务，命令 `node /path/to/javmem-mcp/memory-mcp.js`，环境变量至少给 `MEMV2_TOKEN_FILE` 和 `JAVIS_TOKEN_FILE`（见下文「配置」和「接到 Claude Code」）。
+
+## 三个程序
 
 | 程序 | 接的是 | 工具 |
 |---|---|---|
@@ -34,11 +45,9 @@
   `l` 是 `两边一致`、`两边不同`（`diff` 列出说法不同的那条）、`只在 memv2`、`只在图库` 之一。这个文件由你自己的对照程序生成，只放编号和标签，不放内容；没有这个文件就不标。
 - `MEMORY_AUDIENCE=cc`（或任一边的 `*_AUDIENCE=cc`）：给 Claude Code 用，工具标成只读。
 
-配套的 DeepSeek Harness（Tobs）插件 [dsh-plugin-two-memory](../dsh-plugin-two-memory) 按 Bot 把这两组工具挂上去，不用给每个 Bot 单独接私有 MCP。
-
 ## 做了什么
 
-- **只读**：两个程序只转发查询，不改 memv2 和 Javis 里的任何东西。
+- **只读**：三个程序都只转发查询，不改 memv2 和 Javis 里的任何东西。
 - **按 Bot 分区**：
   - memv2 每个 Bot 用自己的只读客户端令牌，能查哪些命名空间由 memv2 的访问策略决定。
   - Javis 按账号（来源）过滤，每个 Bot 的配置文件列出它能看的账号。
@@ -75,7 +84,7 @@
 | `JAVIS_VERIFY_FILE` | 判定文件，默认程序旁边的 `verify/verdicts.jsonl`（没有 = 每条事实都按规则查） |
 | `JAVIS_AUDIENCE` | 同上 |
 
-### 两个程序共用
+### 三个程序共用
 
 | 变量 | 说明 |
 |---|---|
@@ -135,7 +144,7 @@
 ## 接到 DeepSeek Harness（Tobs）
 
 - 每个 Bot 一个私有 MCP：命令 `node /path/to/memv2-mcp.js`，环境变量填令牌文件的路径。
-- 或者装配套插件 `dsh-plugin-two-memory`：按 Bot 编号自动挂工具，不用卡片。
+- 或者装配套插件 [javmem-dsh-plugin](https://github.com/xuxiaoxiang0721-tech/javmem-dsh-plugin)：按 Bot 编号自动挂工具，不用卡片。
 
 ## 测试
 
@@ -148,7 +157,7 @@ node test/smoke.mjs
 ## 安全
 
 - 令牌只放在文件里，环境变量里只写路径。
-- 两个程序不往标准输出打别的东西，只有 JSON-RPC 消息；日志不记查询内容。
+- 三个程序都不往标准输出打别的东西，只有 JSON-RPC 消息，不记查询内容。
 - 查询走本机或你指定的地址；Javis 的事实查询只按关键词，不调用嵌入模型。
 
 ## 许可证
@@ -159,4 +168,4 @@ node test/smoke.mjs
 
 ## English summary
 
-Read-only stdio MCP servers for chat Bots: `memory-mcp.js`, one combined server over both stores with five tools (recall, search, search_raw, person, read; a fact both stores hold is listed once, a different wording sits next to memv2's, and items carry cross-check labels when `MEMORY_LABELS_FILE` is set), and the two single-store servers it builds on, `memv2-mcp.js` (memv2 fact memory over its HTTP read API) and `javis-mcp.js` (Javis, a Graphiti/Neo4j memory graph, through its own MCP endpoint). No dependencies, Node 20+. Per-Bot partitions (one read-only memv2 client token per Bot; Javis accounts listed in a per-Bot profile), a hide list, a verdict filter for extracted facts, short Chinese tool text for small models. Configure with the environment variables above; tokens live in files, never in the environment. Smoke test: `node test/smoke.mjs`. A companion DeepSeek Harness plugin, `dsh-plugin-two-memory`, registers both tool sets per Bot without per-Bot private MCP cards. License: to be decided.
+Read-only stdio MCP servers for chat Bots: `memory-mcp.js`, one combined server over both stores with five tools (recall, search, search_raw, person, read; a fact both stores hold is listed once, a different wording sits next to memv2's, and items carry cross-check labels when `MEMORY_LABELS_FILE` is set), and the two single-store servers it builds on, `memv2-mcp.js` (memv2 fact memory over its HTTP read API) and `javis-mcp.js` (Javis, a Graphiti/Neo4j memory graph, through its own MCP endpoint). No dependencies, Node 20+. Per-Bot partitions (one read-only memv2 client token per Bot; Javis accounts listed in a per-Bot profile), a hide list, a verdict filter for extracted facts, short Chinese tool text for small models. Configure with the environment variables above; tokens live in files, never in the environment. Smoke test: `node test/smoke.mjs`. A companion DeepSeek Harness plugin, [javmem-dsh-plugin](https://github.com/xuxiaoxiang0721-tech/javmem-dsh-plugin), registers these tools per Bot without per-Bot private MCP cards. Quick start: `git clone https://github.com/xuxiaoxiang0721-tech/javmem-mcp.git`, `node test/smoke.mjs`, then add `node memory-mcp.js` as a stdio server with `MEMV2_TOKEN_FILE` and `JAVIS_TOKEN_FILE` set. License: to be decided.
