@@ -248,6 +248,8 @@ async function wizard(argv) {
       out('\n抽取用哪种模型？个人用的数据量不大，默认选质量好的。');
       const names = Object.keys(MODELS);
       names.forEach((m, i) => out(`  ${i + 1} ${MODELS[m].label}`));
+      out('  两档的差别（2026-11-06 在同样 23 条虚构消息上比的事实库）：gpt-6-luna 记下 21 条，认出了 2 处前后变化；'
+        + '本机千问（qwen3.8-27b，关掉深度思考）也记下 21 条，但只认出 1 处，不花钱、更快。');
       const pick = await q(`选 1-${names.length} [${names.indexOf(models) + 1}]：`, String(names.indexOf(models) + 1));
       models = names[Number(pick) - 1] || models;
       if (!MODELS[models].local && !yes) {

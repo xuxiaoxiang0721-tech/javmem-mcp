@@ -19,6 +19,8 @@ memv2 是 javmem 的事实库：把对话里值得记住的事一条条抽出来
 
 **实测**（2026-11-06；抽取 gpt-6-luna，推理强度用默认；向量用本机的 Qwen3-Embedding-4B；数据是虚构的 23 条消息，分 9 段）：9 段都抽完，1.1 分钟；问了模型 8 次（继承来的那段不问模型），共 12,804 token，每段约 1,600，memv2-lite 自己记的用量和模型报的一样。记下 21 条事实，其中 2 条被后来的说法取代：游泳课从周二改到周三；仓储系统由老陈交给小明。用户记不清的「一共交了 2600」没有顶掉记账的「交了 2400 元」，两条都留着。按这个算，每 1,000 条消息约 60 万 token，比图谱（约 250 万）省得多。
 
+**两档比一比**（同一天、同样的虚构数据，只看计数）：质量档 gpt-6-luna 记下 21 条，认出 2 处前后变化，12,804 token，1.1 分钟；便宜档本机千问（qwen3.8-27b，关掉深度思考：`MEMV2_EXTRA_BODY={"chat_template_kwargs":{"enable_thinking":false}}`）也记下 21 条，但只认出 1 处（漏了仓储系统交接），9,026 token、不花钱，0.4 分钟。两档都没有被丢掉的条目，记账的 2400 元都没被顶掉。所以默认用质量档；想省钱，可以把便宜模型设成 `MEMV2_MODEL_CHEAP`，只给短段落用（不超过 `MEMV2_CHEAP_CHARS`=1600 字、`MEMV2_CHEAP_MESSAGES`=4 条）。
+
 ## 装
 
 不用 Docker（要 Node 22.5 以上）：
@@ -70,5 +72,6 @@ memv2-lite (`memv2-lite.js`, command `javmem-memv2`) is a small public memv2: th
 - One namespace per Bot with its own read-only token (it sees its namespace and `shared`); the feeder uses a writable token. Only token hashes are stored.
 - A daily token budget (`MEMV2_DAILY_TOKENS`, default 1,000,000), counted from what the model reports; an optional cheaper model for short stretches (`MEMV2_MODEL_CHEAP`).
 - Measured 2026-11-06 (gpt-6-luna at its default reasoning, local Qwen3-Embedding-4B, 23 made-up messages in 9 stretches): all 9 in 1.1 minutes, 8 model calls (the inherited package needs none), 12,804 tokens, about 1,600 per stretch, the same count the model reported; 21 facts, 2 of them superseded by later statements (a class moved from Tuesday to Wednesday; a system handed over), while the user's unsure "2,600 in all" did not replace the recorded "paid 2,400". Roughly 600,000 tokens per 1,000 messages, against about 2.5 million for the graph.
+- Two tiers on the same made-up data (counts only): gpt-6-luna kept 21 facts and caught 2 changes over time, 12,804 tokens, 1.1 minutes; a local Qwen (qwen3.8-27b with thinking off) also kept 21 but caught 1 change, 9,026 tokens at no cost, 0.4 minutes; neither dropped anything. So the good model is the default, and a cheaper one can take the short stretches (`MEMV2_MODEL_CHEAP`, at most `MEMV2_CHEAP_CHARS`=1600 characters and `MEMV2_CHEAP_MESSAGES`=4 messages).
 - Run it with `npx -y -p javmem-mcp javmem-memv2 serve` (Node 22.5+) or `docker compose up -d --build` here; it listens on `http://127.0.0.1:8766`. Feed it with `javmem-feed --memv2 … --memv2-token-file … --namespace …`.
 - It is a rewrite in the original's spirit, not the original code: the same interface and extraction rules (verbatim evidence, nothing the source does not say, numbers that match, old and new kept apart), fewer fields and none of the original's file extraction, alias merging or checking jobs.
