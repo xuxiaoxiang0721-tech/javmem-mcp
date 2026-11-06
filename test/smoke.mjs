@@ -437,10 +437,25 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   assert.match(text(b.get(1).result), /namespace_forbidden/);
   const c = await session('memv2-mcp.js', { ...env, MEMV2_TOKEN_FILE: tokB, MEMV2_NAMESPACE: '' }, [{}, call('search', { query: '游泳课' })]);
   assert.match(text(c.get(1).result), /没有找到/, 'another Bot sees nothing of bot-a');
+
+  // Backend A: the same local store also fed to the graph; the combined server answers from both stores.
+  const { feedGraphiti } = req('../feed.js');
+  const { startFakeGraphiti } = await import('./fake-graphiti.mjs');
+  const fake = await startFakeGraphiti();
+  const s3 = new LocalStore(db);
+  const fr = await feedGraphiti(s3, { url: fake.url, group: 'bot-a', owner: '小明', window: 10, now: Date.parse('2026-11-06T12:00:00+08:00') });
+  assert.equal(fr.sent, 4);
+  await feedGraphiti(s3, { url: fake.url, group: 'bot-a', now: Date.parse('2026-11-06T12:01:00+08:00') });
+  s3.close();
+  const full = { ...env, JAVIS_BACKEND: 'graphiti', JAVIS_URL: fake.url, JAVMEM_LOCAL_DB: db, GRAPHITI_GROUP_ID: 'bot-a' };
+  const d = await session('memory-mcp.js', full, [{}, call('search', { query: '小雨 游泳课' }), { method: 'javmem/status', params: {} }]);
+  assert.match(text(d.get(1).result), /【memv2：事实、金额以这里为准】[\s\S]*小雨的游泳课改到每周三下午了[\s\S]*【图库：人和关系、时间线】/);
+  assert.deepEqual(d.get(2).result.stores.map((x) => [x.store, x.state]), [['memv2', 'ok'], ['javis', 'ok']]);
+  await fake.close();
   server.close();
   ms.close();
   await llm.close();
-  ok('memv2-lite: feed once, quotes checked, budget, cheap tier, superseded, inherited without a model, per-Bot tokens');
+  ok('memv2-lite: feed once, quotes checked, budget, cheap tier, superseded, inherited without a model, per-Bot tokens; with the graph (backend A) the combined server answers from both');
 }
 
 // scripts/eval.mjs on the demo questions: the counts it prints, and nothing but counts.

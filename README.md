@@ -181,6 +181,10 @@ Javis 那层没有公开，图谱可以换成 [Graphiti](https://github.com/getz
 - **花多少**：按模型自己报的用量算，每天有上限（默认 100 万 token）。2026-11-06 自测（gpt-6-luna，虚构的 23 条消息分 9 段）：共 12,804 token，每段约 1,600，约合每 1,000 条消息 60 万 token。
 - 是照原版的做法重写的，不是原版的代码：接口和抽取的规矩一样，字段更少，没有原版的文件抽取、别名合并和核对后台。
 
+## 全套：事实库加图谱（后端 A）
+
+`backend/full/` 一个 compose 起两个库（memv2 精简版和 Graphiti 官方服务），用同一份 `.env` 里的模型；加 `--profile local` 连模型也放在本机（Ollama）。`javmem-feed` 同时写 `--memv2` 和 `--graphiti` 就两边都送，合起来的 `memory-mcp.js` 一次查两个库。要 Docker、约 12 GB 硬盘。见 [backend/full/README.md](backend/full/README.md)。
+
 ## 做了什么
 
 - **只读**：三个程序都只转发查询，不改 memv2 和 Javis 里的任何东西。

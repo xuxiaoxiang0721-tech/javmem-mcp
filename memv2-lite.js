@@ -59,7 +59,6 @@ function config() {
     embedUrl: env('EMBEDDER_API_URL', ''),
     embedKey: keyFrom('EMBEDDER_API_KEY'),
     embedModel: env('EMBEDDER_MODEL', ''),
-    embedDim: num('EMBEDDER_DIM', 0),
     dailyTokens: num('MEMV2_DAILY_TOKENS', 1000000),
     everyMs: num('MEMV2_WORKER_MS', 3000),
     timeoutMs: num('MEMV2_LLM_TIMEOUT_MS', 300000),
@@ -332,8 +331,8 @@ async function embed(cfg, texts) {
   const out = [];
   for (let i = 0; i < texts.length; i += 16) {
     const batch = texts.slice(i, i + 16).map((t) => (String(t).trim() ? String(t) : '-'));
+    // No "dimensions": not every service takes it, and each model's own size is what both stores expect.
     const body = { model: cfg.embedModel, input: batch, encoding_format: 'float' };
-    if (cfg.embedDim) body.dimensions = cfg.embedDim;
     const r = await postJson(join(cfg.embedUrl, '/embeddings'), body, cfg.embedKey, 120000);
     if (r.status !== 200 || !r.json || !Array.isArray(r.json.data)) throw Object.assign(new Error(`embedding HTTP ${r.status}`), { retry: true });
     const rows = [...r.json.data].sort((a, b) => (a.index || 0) - (b.index || 0));

@@ -13,6 +13,7 @@
 - 继承别的 AI 的记忆：`inherit.js`（命令 `javmem-inherit`）给出导出提示词（中英文，也在 `docs/inherit-prompt.md`），检查和导入别的 AI 写出的 javmem 包，导进本地库时标上来源，同一个包不重复导入；附一个虚构的示例包 `demo/inherit-grok.json`。
 - 图谱可以接 Graphiti 官方服务（后端 C）：`javis-mcp.js` 设 `JAVIS_BACKEND=graphiti`，四个工具照旧（事实从 Graphiti 来，原话从本地库来，`graphiti.js`）；`feed.js`（命令 `javmem-feed`）把本地库里的对话按段送进 Graphiti，每段一次，有每天的 token 上限，丢了会重送；`backend/graphiti/` 是官方镜像的 compose 菜谱，模型可选 OpenAI、DeepSeek 加千问、本地 Ollama。用 gpt-6-luna 和本机向量模型实测过。
 - 事实库的公开精简版 memv2-lite（后端 B）：`memv2-lite.js`（命令 `javmem-memv2`）回答 `memv2-mcp.js` 用的读接口，`/api/v1/ingest` 收对话；原话存成记录，按段问模型抽事实，证据要逐字出自原话，数字要对得上，新的说法取代旧的（记不清的不算），继承包不问模型；向量可选；按 Bot 分区，令牌只存哈希；每天的 token 上限按模型报的用量算，可另设便宜模型管短段落。`javmem-feed --memv2` 往里送。`backend/memv2/` 有 Dockerfile、compose 和三种模型配法。
+- 全套（后端 A）：`backend/full/` 一个 compose 起 memv2 精简版和 Graphiti 官方服务，同一份 `.env`；`--profile local` 加一个 Ollama，第一次自动下载模型。`javmem-feed` 同时写 `--memv2` 和 `--graphiti` 就两边都送。
 
 English:
 
@@ -26,6 +27,7 @@ English:
 - Memory inherited from other AIs: `inherit.js` (command `javmem-inherit`) gives the export prompt (Chinese and English, also in `docs/inherit-prompt.md`), checks and imports the javmem package another AI writes into a local store, marked with where it came from, each package once; a made-up example package is in `demo/inherit-grok.json`.
 - The graph on the official Graphiti server (backend C): `javis-mcp.js` with `JAVIS_BACKEND=graphiti` keeps its four tools (facts from Graphiti, the original words from the local store; `graphiti.js`); `feed.js` (command `javmem-feed`) sends the local store's conversations to Graphiti in episodes, each once, within a daily token budget, resending what Graphiti lost; `backend/graphiti/` is a compose recipe for the official image, with models from OpenAI, DeepSeek with Qwen, or a local Ollama. Tested with gpt-6-luna and a local embedding model.
 - memv2-lite, a small public fact store (backend B): `memv2-lite.js` (command `javmem-memv2`) answers the read interface `memv2-mcp.js` uses and takes conversations at `/api/v1/ingest`; it keeps the messages as records, asks a model for the facts of each stretch with quotes that must be copied from the messages and numbers that must match, lets newer statements supersede older ones (unsure ones do not), and stores inherited packages without a model call; embeddings optional; one namespace per Bot, token hashes only; a daily token budget counted from the model's own usage, and an optional cheaper model for short stretches. `javmem-feed --memv2` feeds it. `backend/memv2/` has a Dockerfile, a compose file and three model setups.
+- The full set (backend A): `backend/full/` starts memv2-lite and the official Graphiti server in one compose with one `.env`; `--profile local` adds an Ollama that pulls the models the first time. `javmem-feed` with both `--memv2` and `--graphiti` feeds both.
 - Measured numbers: `scripts/eval.mjs` compares the combined server with each store alone on the same questions and prints counts only; the README has the results on the author's memory (2/7, the same as either store; 97.4% of facts both stores hold agree) and on the demo data.
 
 ## 0.2.0

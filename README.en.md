@@ -181,6 +181,10 @@ The original memv2 is not public, so the package carries a small public one, `me
 - **Cost**: counted from what the model reports, within a daily budget (default 1,000,000 tokens). Measured 2026-11-06 (gpt-6-luna, 23 made-up messages in 9 stretches): 12,804 tokens, about 1,600 per stretch, roughly 600,000 per 1,000 messages.
 - A rewrite in the original's spirit, not the original code: the same interface and extraction rules, fewer fields, none of the original's file extraction, alias merging or checking jobs.
 
+## The full set: facts and graph (backend A)
+
+`backend/full/` starts both stores (memv2-lite and the official Graphiti server) in one compose, with the models from one `.env`; `--profile local` puts the models on this computer too (Ollama). `javmem-feed` with both `--memv2` and `--graphiti` feeds both, and the combined `memory-mcp.js` asks both at once. Needs Docker and about 12 GB of disk. See [backend/full/README.md](backend/full/README.md).
+
 ## What they do
 
 - **Read-only**: all three only forward queries and change nothing in memv2 or Javis.
