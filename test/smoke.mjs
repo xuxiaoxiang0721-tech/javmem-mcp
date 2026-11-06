@@ -343,7 +343,7 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   assert.match(t(3), /#1 \[2026-09-14\] user：小雨的游泳课改到每周三下午了[\s\S]*下一页用 offset=2/);
   const st = a.get(4).result.stores[0];
   assert.deepEqual([st.state, st.backend, st.group], ['ok', 'graphiti', 'bot-a']);
-  assert.match(st.detail, /^图谱里 3 段，处理中 0 段，排队 0 段$/);
+  assert.match(st.detail, /^图谱里 3 段，处理中 0 段，排队 0 段；今天约用 [\d,]+ token$/);
   assert.match(t(5), /先用 search_memory 查一次/);
   // An entity id from a search, then its relations, in one process (as a Bot would ask).
   const uuid = t(1).match(/实体号：([0-9a-f-]{36})/)[1];
@@ -432,6 +432,7 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   assert.match(t(3), /周教练/);
   assert.match(t(4), /"record_key": "sess-1:3"/);
   assert.equal(a.get(5).result.stores[0].state, 'ok');
+  assert.equal(a.get(5).result.stores[0].detail, '记录 9 条，事实 7 条（另有 1 条已被取代），排队 0 段；今天抽取用了 3,300 token（上限 1,000,000）');
   assert.match(t(6), /^\[2026-09-14\] [^\n]*\n\[2026-10-02\] /, 'entity search: what holds now, in time order');
   const b = await session('memv2-mcp.js', { ...env, MEMV2_TOKEN_FILE: tokB }, [{}, call('search', { query: '游泳课' })]);
   assert.match(text(b.get(1).result), /namespace_forbidden/);
@@ -456,6 +457,45 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   ms.close();
   await llm.close();
   ok('memv2-lite: feed once, quotes checked, budget, cheap tier, superseded, inherited without a model, per-Bot tokens; with the graph (backend A) the combined server answers from both');
+}
+
+// The install wizard and the estimate (items 13 and 17): the four choices with what they cost, the quote before
+// anything is written, nothing written on a no; with a yes, each backend's files (a folder that stands alone).
+{
+  const { spawnSync } = await import('node:child_process');
+  const { existsSync, statSync } = await import('node:fs');
+  const cli = (args, input) => spawnSync(process.execPath, [join(root, 'memory-mcp.js'), ...args], { encoding: 'utf8', timeout: 60000, input });
+  const est = JSON.parse(cli(['estimate', join(root, 'demo', 'inherit-grok.json'), '--json']).stdout);
+  assert.deepEqual([est.messages, est.inherited, est.packages, est.stretches, est.episodes, est.tokens.memv2, est.tokens.graphiti],
+    [0, 5, 1, 0, 1, 0, 20000], 'an inherited package costs the fact store nothing');
+  const dir = join(scratch, 'setup');
+  const no = cli(['setup', '--dir', join(dir, 'no')], 'C\n2\n\n\n500000\n小明\ntob\n\nn\n');
+  assert.equal(no.status, 1);
+  assert.match(no.stdout, /C     图谱（Graphiti 官方）[\s\S]*约 250 万 token/);
+  assert.match(no.stdout, /报价：\n  你选了 C 图谱（Graphiti 官方），每 1,000 条消息大约花 约 250 万 token；每个 Bot 每天最多 500,000 token。/);
+  assert.match(no.stdout, /没写任何文件。/);
+  assert.ok(!existsSync(join(dir, 'no')), 'a no writes nothing');
+  const run = (b) => cli(['setup', '--backend', b, '--models', 'openai', '--owner', '小明', '--bots', 'tob', '--dir', join(dir, b), '--yes',
+    '--estimate', join(root, 'demo', 'inherit-grok.json')]);
+  for (const b of ['A', 'B', 'C', 'D']) assert.equal(run(b).status, 0, `setup ${b}`);
+  const cfg = (b) => JSON.parse(readFileSync(join(dir, b, 'plugin-config.json'), 'utf8'));
+  assert.deepEqual(['A', 'B', 'C', 'D'].map((b) => cfg(b).backend), ['full', 'memv2', 'graphiti', 'local']);
+  assert.ok(!existsSync(join(dir, 'D', '.env')), 'the local store needs no models');
+  assert.match(readFileSync(join(dir, 'B', '.env'), 'utf8'), /^MODEL_NAME=gpt-6-luna$/m);
+  const lite = (await import('node:module')).createRequire(import.meta.url)('../memv2-lite.js');
+  const ms = new lite.Store(join(dir, 'B', 'memv2-data', 'memv2-lite.sqlite'));
+  const feeder = ms.client(readFileSync(join(dir, 'B', 'tokens', 'feeder.token'), 'utf8').trim());
+  const reader = ms.client(readFileSync(join(dir, 'B', 'tokens', 'reader.token'), 'utf8').trim());
+  ms.close();
+  assert.deepEqual([feeder.write, reader.write], [true, false]);
+  assert.equal(cfg('B').backends.memv2.namespace, 'bot-{slug}');
+  const compose = readFileSync(join(dir, 'A', 'docker-compose.yml'), 'utf8');
+  assert.ok(compose.includes('context: ./memv2-image') && compose.includes('./graphiti-config.yaml:/app/mcp/config/config.yaml:ro'));
+  assert.ok(['Dockerfile', 'memv2-lite.js', 'local-store.js', 'package.json'].every((f) => existsSync(join(dir, 'A', 'memv2-image', f))));
+  assert.ok(existsSync(join(dir, 'C', 'docker-compose.yml')) && existsSync(join(dir, 'C', 'config.yaml')));
+  assert.equal(cfg('C').backends.graphiti.group, 'bot-{slug}');
+  if (process.platform !== 'win32') assert.equal(statSync(join(dir, 'B', '.env')).mode & 0o777, 0o600);
+  ok('setup wizard: four choices with their cost, the quote first, nothing on a no, each backend\'s files; estimate counts only');
 }
 
 // scripts/eval.mjs on the demo questions: the counts it prints, and nothing but counts.

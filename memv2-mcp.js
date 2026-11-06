@@ -368,12 +368,26 @@ async function status() {
   }
   try {
     await memv2('GET', '/api/v1/records/javmem-status-check', undefined, 5000);
-    return { ...out, state: 'ok' };
   } catch (err) {
-    if (err.status === 404 || (err.status === 403 && !TOKEN_ERRORS.has(err.code))) return { ...out, state: 'ok' };
-    if (err.status === 401 || err.status === 403) return { ...out, state: 'bad_token', detail: err.message };
-    return { ...out, state: err.status ? 'error' : 'down', detail: err.message };
+    if (err.status === 401 || (err.status === 403 && TOKEN_ERRORS.has(err.code))) return { ...out, state: 'bad_token', detail: err.message };
+    if (err.status !== 404 && err.status !== 403) return { ...out, state: err.status ? 'error' : 'down', detail: err.message };
   }
+  // memv2-lite also reports how far it has got and what it spent today (counts only); the original memv2 has no
+  // such endpoint, and then there is just "ok".
+  try {
+    const s = await memv2('GET', '/api/v1/status', undefined, 5000);
+    if (s && s.windows && s.today) {
+      const n = (x) => Number(x || 0).toLocaleString('en-US');
+      const cap = Number(s.today.limit || 0);
+      return {
+        ...out, state: 'ok', backend: 'memv2-lite',
+        detail: `记录 ${n(s.records)} 条，事实 ${n(s.items)} 条（另有 ${n(s.superseded)} 条已被取代），排队 ${n(s.windows.pending)} 段`
+          + `${s.windows.failed ? `，失败 ${n(s.windows.failed)} 段` : ''}；今天抽取用了 ${n(s.today.tokens)} token`
+          + `${cap ? `（上限 ${n(cap)}${s.paused === 'budget' ? '，已到上限，明天接着抽' : ''}）` : ''}`,
+      };
+    }
+  } catch { /* not memv2-lite */ }
+  return { ...out, state: 'ok' };
 }
 
 const HANDLERS = { recall, search, search_raw: searchRaw, read_record: readRecord };

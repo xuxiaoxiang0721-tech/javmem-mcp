@@ -185,6 +185,31 @@ Javis 那层没有公开，图谱可以换成 [Graphiti](https://github.com/getz
 
 `backend/full/` 一个 compose 起两个库（memv2 精简版和 Graphiti 官方服务），用同一份 `.env` 里的模型；加 `--profile local` 连模型也放在本机（Ollama）。`javmem-feed` 同时写 `--memv2` 和 `--graphiti` 就两边都送，合起来的 `memory-mcp.js` 一次查两个库。要 Docker、约 12 GB 硬盘。见 [backend/full/README.md](backend/full/README.md)。
 
+## 装的时候选：安装向导
+
+```bash
+npx -y javmem-mcp setup
+```
+
+它先列出四种后端（D 本地库、B 事实库、C 图谱、A 全套）记什么、花多少、要装什么，再问：用哪种模型（默认质量好的 gpt-6-luna，也可以选 DeepSeek 加千问、或本机 Ollama）、每个 Bot 每天最多花多少 token、记忆是谁的、哪些 Bot。有要一次导入的历史，给它本地库或继承包的路径，它按实际段数报价。**你说好了才写文件**，写进一个文件夹（默认 `./javmem`）：模型设置 `.env`、要起的 compose 或启动脚本、memv2 精简版的库和令牌、给 DSH 插件的 `plugin-config.json`。它不启动任何东西，也不往外发东西。最后打印接下来要做的几步。
+
+不交互的写法：`npx -y javmem-mcp setup --backend A|B|C|D --models openai|deepseek|ollama --owner 小明 --bots tob --daily-tokens 1000000 --yes`。
+
+## 花多少
+
+| 后端 | 每 1,000 条消息大约 | 依据 |
+|---|---|---|
+| D 本地库 | 0 | 不问模型 |
+| B 事实库（memv2 精简版） | 约 60 万 token | 每段（几条消息）问一次模型；实测每段约 1,600 |
+| C 图谱（Graphiti 官方） | 约 250 万 token | 每段问模型好几次；实测每段约 1.5 万，按 2 万估 |
+| A 全套 | 约 310 万 token | B 加 C |
+
+依据是作者的机器上 2026-11-06 的实测：抽取用 gpt-6-luna，向量用本机的 Qwen3-Embedding-4B（不花钱），数据是虚构的 23 条消息。换了模型、对话长短不同，数会变。
+
+- **先估一估**：`npx -y javmem-mcp estimate <本地库 .sqlite | 继承包文件 | 放包的文件夹>`，按实际要送的段数报 B、C、A 各要多少 token、按每天上限要几天，只打印条数。
+- **每天有上限**：事实库按模型自己报的用量算（`MEMV2_DAILY_TOKENS`，默认 100 万）；图谱拿不到用量，按段数折算（`javmem-feed --daily-tokens`，默认每个库 100 万）。到了就停，第二天从停下的地方接着来，重启不丢计数（记在库里）。`javmem/status` 报今天用了多少、上限多少。
+- 别的 AI 记得的事（继承包）进事实库不问模型，不花钱。
+
 ## 做了什么
 
 - **只读**：三个程序都只转发查询，不改 memv2 和 Javis 里的任何东西。

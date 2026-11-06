@@ -684,10 +684,16 @@ async function status() {
     } catch (err) {
       return { ...out, state: err.status ? 'error' : 'down', detail: err.message };
     }
+    // What the feeder counted today (Graphiti reports no usage, so it is counted per episode) and the day's limit.
+    const d = new Date();
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const spent = localStore().spend(day, 'graphiti');
+    const cap = Number(process.env.GRAPHITI_DAILY_TOKENS || '');
     return {
       ...out, state: 'ok',
       detail: `图谱里 ${counts.done} 段，处理中 ${counts.sent} 段，排队 ${counts.pending} 段`
-        + `${counts.failed ? `，失败 ${counts.failed} 段` : ''}`,
+        + `${counts.failed ? `，失败 ${counts.failed} 段` : ''}；今天约用 ${spent.tokens.toLocaleString('en-US')} token`
+        + `${Number.isFinite(cap) && cap > 0 ? `（上限 ${cap.toLocaleString('en-US')}${spent.tokens >= cap ? '，已到上限，明天接着送' : ''}）` : ''}`,
     };
   }
   try {

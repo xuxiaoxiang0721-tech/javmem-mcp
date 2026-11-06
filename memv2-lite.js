@@ -701,13 +701,24 @@ function serve(cfg) {
   return { store, server, worker };
 }
 
+/** Reads KEY=value lines (a .env file) into the environment; what the environment already has wins. */
+function loadEnv(file) {
+  for (const line of fs.readFileSync(file, 'utf8').replace(/^﻿/, '').split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!m || line.trim().startsWith('#')) continue;
+    const value = m[2].replace(/^(['"])(.*)\1$/, '$2');
+    if (process.env[m[1]] == null || process.env[m[1]] === '') process.env[m[1]] = value;
+  }
+}
+
 function main(argv) {
-  const cfg = config();
   const [cmd, sub, name] = argv;
   const flag = (n) => {
     const i = argv.indexOf(n);
     return i >= 0 ? argv[i + 1] : undefined;
   };
+  if (flag('--env')) loadEnv(flag('--env'));
+  const cfg = config();
   if (flag('--db')) cfg.db = flag('--db');
   if (cmd === 'serve') {
     if (flag('--port')) cfg.port = Number(flag('--port'));
@@ -751,7 +762,7 @@ function main(argv) {
     return 0;
   }
   process.stdout.write([
-    '用法：javmem-memv2 serve [--db <库文件>] [--port 8766]',
+    '用法：javmem-memv2 serve [--db <库文件>] [--port 8766] [--env <.env 文件>]',
     '      javmem-memv2 token add <名字> [--namespace a,b] [--write] [--out <令牌文件>]',
     '      javmem-memv2 token list | token remove <名字> | status',
     '模型和向量在环境变量里设：MODEL_NAME、OPENAI_API_URL、OPENAI_API_KEY（或 OPENAI_API_KEY_FILE）、',
@@ -766,4 +777,4 @@ if (require.main === module) {
   if (code != null) process.exitCode = code;
 }
 
-module.exports = { Store, Worker, createServer, ingest, validate, promptOf, scopeOf, rankItems, config, main, SYSTEM, VERSION };
+module.exports = { Store, Worker, createServer, ingest, validate, promptOf, scopeOf, rankItems, config, loadEnv, main, SYSTEM, VERSION };

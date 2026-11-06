@@ -33,6 +33,7 @@
     "graphiti.js",
     "feed.js",
     "memv2-lite.js",
+    "setup.js",
     "backend/",
     "demo.js",
     "demo/",

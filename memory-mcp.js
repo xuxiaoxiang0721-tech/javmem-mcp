@@ -409,7 +409,11 @@ async function handle(line) {
   if (isRequest) send({ jsonrpc: '2.0', id: msg.id, result });
 }
 
-if (require.main === module) {
+const COMMANDS = ['setup', 'estimate'];
+if (require.main === module && COMMANDS.includes(process.argv[2])) {
+  // npx -y javmem-mcp setup | estimate <path>: the install wizard and the cost estimate, not the server.
+  require('./setup.js').main(process.argv.slice(2)).then((code) => { process.exitCode = code; });
+} else if (require.main === module) {
   let pending = 0;
   let closing = false;
   const rl = readline.createInterface({ input: process.stdin });

@@ -185,6 +185,31 @@ The original memv2 is not public, so the package carries a small public one, `me
 
 `backend/full/` starts both stores (memv2-lite and the official Graphiti server) in one compose, with the models from one `.env`; `--profile local` puts the models on this computer too (Ollama). `javmem-feed` with both `--memv2` and `--graphiti` feeds both, and the combined `memory-mcp.js` asks both at once. Needs Docker and about 12 GB of disk. See [backend/full/README.md](backend/full/README.md).
 
+## Choosing at install: the setup wizard
+
+```bash
+npx -y javmem-mcp setup
+```
+
+It lists the four backends (D local store, B fact store, C graph, A full set) with what each keeps, costs and needs, then asks: which models (by default the good gpt-6-luna; or DeepSeek with Qwen, or a local Ollama), how many tokens a Bot may spend a day, whose memory it is, which Bots. Give it a local store or inherited packages to import and it quotes from the actual number of stretches. **It writes nothing until you say yes**, then fills one folder (default `./javmem`): the model settings `.env`, the compose files or start scripts, memv2-lite's store and tokens, and `plugin-config.json` for the DSH plugin. It starts nothing and sends nothing anywhere, and ends with the next steps.
+
+Without questions: `npx -y javmem-mcp setup --backend A|B|C|D --models openai|deepseek|ollama --owner Alex --bots tob --daily-tokens 1000000 --yes`.
+
+## What it costs
+
+| Backend | Per 1,000 messages, roughly | Why |
+|---|---|---|
+| D local store | 0 | no model |
+| B fact store (memv2-lite) | about 600,000 tokens | one model call per stretch of a few messages; measured about 1,600 each |
+| C graph (official Graphiti) | about 2.5 million tokens | several calls per stretch; measured about 15,000 each, counted as 20,000 |
+| A full set | about 3.1 million tokens | B plus C |
+
+Measured on the author's machine on 2026-11-06: gpt-6-luna for extraction, a local Qwen3-Embedding-4B for vectors (free), 23 made-up messages. Other models and other conversation lengths give other numbers.
+
+- **Estimate first**: `npx -y javmem-mcp estimate <local store .sqlite | package file | folder of packages>` gives B, C and A's tokens from the stretches that would actually go, and the days at the daily limit; counts only.
+- **A daily limit**: the fact store counts what the model reports (`MEMV2_DAILY_TOKENS`, default 1,000,000); the graph reports nothing, so it counts per episode (`javmem-feed --daily-tokens`, default 1,000,000 per store). At the limit it stops and goes on the next day where it stopped; the counts live in the stores, so a restart loses nothing. `javmem/status` shows today's spend and the limit.
+- Facts remembered by another AI (inherited packages) go into the fact store without a model call, at no cost.
+
 ## What they do
 
 - **Read-only**: all three only forward queries and change nothing in memv2 or Javis.
