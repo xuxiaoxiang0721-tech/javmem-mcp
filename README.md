@@ -1,21 +1,100 @@
 # javmem-mcp
 
-给聊天 Bot（以及 Claude Code）查记忆用的只读 MCP 服务：一个把两个记忆库合起来的工具，和它用到的两个单库服务。两个库是 memv2（事实记忆）和 Javis（Graphiti + Neo4j 的记忆图谱）。这些程序自己不存记忆，只替 Bot 去这两个库里查；两个库不在本仓库里，目前也没有公开发布（见下文「前提」）。
+中文 | [English](README.en.md)
 
-配套的 DeepSeek Harness（Tobs）插件：[javmem-dsh-plugin](https://github.com/xuxiaoxiang0721-tech/javmem-dsh-plugin)，按 Bot 自动挂上这些工具，不用给每个 Bot 单独接私有 MCP。
+[![npm](https://img.shields.io/npm/v/javmem-mcp)](https://www.npmjs.com/package/javmem-mcp)
+[![test](https://github.com/xuxiaoxiang0721-tech/javmem-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/xuxiaoxiang0721-tech/javmem-mcp/actions/workflows/test.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+**一个只读的记忆 MCP：同时查事实库 memv2 和记忆图谱 Javis，两边对照着回答；Claude Code、DeepSeek Harness 和别的 MCP 客户端都能接。**
+
+这一套记忆叫 javmem：memv2 记事实（谁、什么时候、多少钱），Javis 记人和事的关系、时间线（Graphiti + Neo4j）。javmem-mcp 把两个库合成一个工具给模型用：两个库都记了的只列一次，说法不同的并排列出、以 memv2 为准；每个 Bot 用自己的令牌，只看得到自己那一份。程序自己不存记忆，只替模型去两个库里查。
+
+## 适合谁，不适合谁
+
+适合：
+
+- 已经在跑 memv2 和 Javis，想让 Claude Code、聊天 Bot 都能查这份记忆的人；
+- 养了好几个 Bot、要每个 Bot 各查各的记忆的人：分区落在每个 Bot 的令牌和配置文件上；
+- 要「查到的先核对再给看」的人：Javis 的事实要和原文对上才显示，说错的可以放进隐藏名单。
+
+不适合：
+
+- 没有 memv2 和 Javis、也不打算自己搭的人：这两个库目前没有公开发布（见「前提」）；
+- 想要 MCP 自己记下新对话的人：这里只读，写入走 memv2 和 Javis 自己的导入。
+
+在 DeepSeek Harness 的 Tobs 里用，可以装配套插件 [javmem-dsh-plugin](https://github.com/xuxiaoxiang0721-tech/javmem-dsh-plugin)，按 Bot 自动挂上这些工具，不用给每个 Bot 单独接 MCP。
 
 ## 快速开始
 
-1. 准备：Node 20 以上；memv2 和 Javis 在运行，每个 Bot 有自己的令牌文件（见下文「前提」）。
-2. 下载：`git clone https://github.com/xuxiaoxiang0721-tech/javmem-mcp.git`（没有依赖，不用 `npm install`）。
-3. 自测：`node test/smoke.mjs`，不需要两个库在跑。
-4. 接上：在 Claude Code 的 `.mcp.json` 或你的 Bot 平台里加一个 stdio 服务，命令 `node /path/to/javmem-mcp/memory-mcp.js`，环境变量至少给 `MEMV2_TOKEN_FILE` 和 `JAVIS_TOKEN_FILE`（见下文「配置」和「接到 Claude Code」）。
+1. **准备**：Node 20 以上；memv2 和 Javis 在运行，每个 Bot 有自己的令牌文件（见「前提」）。
+2. **拿到程序**，两种任选：
+   - npm 包（发布后）：`npx -y javmem-mcp` 就能起合起来的服务，不用先下载；
+   - git：`git clone https://github.com/xuxiaoxiang0721-tech/javmem-mcp.git`，没有依赖，不用 `npm install`。
+3. **自测**（git 方式）：`node test/smoke.mjs`，不需要两个库在跑。
+4. **接上**：见下面的「接到 Claude Code」和「接到 DeepSeek Harness（Tobs）」。环境变量至少给 `MEMV2_TOKEN_FILE` 和 `JAVIS_TOKEN_FILE`。
+
+## 接到 Claude Code
+
+一条命令（npm 包发布后）：
+
+```bash
+claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_TOKEN_FILE=/path/to/profiles/bot_a.env -e MEMORY_AUDIENCE=cc -- npx -y javmem-mcp
+```
+
+或者写在项目的 `.mcp.json` 里，用合起来的工具：
+
+```json
+{
+  "mcpServers": {
+    "memory": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/path/to/javmem-mcp/memory-mcp.js"],
+      "env": {
+        "MEMV2_TOKEN_FILE": "/path/to/tokens/bot_a.token",
+        "JAVIS_TOKEN_FILE": "/path/to/profiles/bot_a.env",
+        "MEMORY_LABELS_FILE": "/path/to/labels.json",
+        "MEMORY_AUDIENCE": "cc"
+      }
+    }
+  }
+}
+```
+
+或者分开用两个：
+
+```json
+{
+  "mcpServers": {
+    "memv2": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/path/to/javmem-mcp/memv2-mcp.js"],
+      "env": { "MEMV2_TOKEN_FILE": "/path/to/tokens/bot_a.token", "MEMV2_AUDIENCE": "cc" }
+    },
+    "javis": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/path/to/javmem-mcp/javis-mcp.js"],
+      "env": { "JAVIS_TOKEN_FILE": "/path/to/profiles/bot_a.env", "JAVIS_AUDIENCE": "cc" }
+    }
+  }
+}
+```
+
+`MEMORY_AUDIENCE=cc`（或任一边的 `*_AUDIENCE=cc`）让工具标成只读，Claude Code 在计划模式里也能用；提示语也换成写给 Claude Code 的。
+
+## 接到 DeepSeek Harness（Tobs）
+
+- 装配套插件 [javmem-dsh-plugin](https://github.com/xuxiaoxiang0721-tech/javmem-dsh-plugin)：按 Bot 编号自动挂工具，不用卡片（推荐）。
+- 或者每个 Bot 一个私有 MCP：命令 `node /path/to/memory-mcp.js`，环境变量填这个 Bot 的令牌文件路径。
 
 ## 三个程序
 
 | 程序 | 接的是 | 工具 |
 |---|---|---|
-| `memory-mcp.js` | **两个库合起来的一个工具**（推荐） | `recall`、`search`、`search_raw`、`person`、`read` |
+| `memory-mcp.js`（命令 `javmem-mcp`） | **两个库合起来的一个工具**（推荐） | `recall`、`search`、`search_raw`、`person`、`read` |
 | `memv2-mcp.js` | memv2：事实记忆服务（HTTP 读接口） | `recall`、`search`、`search_raw`、`read_record` |
 | `javis-mcp.js` | Javis：Graphiti + Neo4j 的记忆图谱（通过它自带的 MCP 端点） | `search_memory`、`get_entity`、`find_sessions`、`get_conversation` |
 
@@ -23,7 +102,7 @@
 
 ## 合起来的工具 memory-mcp.js
 
-一个 MCP 服务同时查两个库，给 Bot 五个工具，代替分开的八个：
+一个 MCP 服务同时查两个库，给模型五个工具，代替分开的八个：
 
 | 工具 | 做什么 |
 |---|---|
@@ -43,7 +122,6 @@
   ```
 
   `l` 是 `两边一致`、`两边不同`（`diff` 列出说法不同的那条）、`只在 memv2`、`只在图库` 之一。这个文件由你自己的对照程序生成，只放编号和标签，不放内容；没有这个文件就不标。
-- `MEMORY_AUDIENCE=cc`（或任一边的 `*_AUDIENCE=cc`）：给 Claude Code 用，工具标成只读。
 
 ## 做了什么
 
@@ -106,61 +184,13 @@
 - 隐藏名单 `hidden.json`：`{"facts": [...], "entities": [...], "sessions": [...], "messages": [...]}`，每项是 id 字符串或 `{"id": "..."}`。单条消息用指纹：`"fp:"` 加上 `sha256(role + "\n" + timestamp + "\n" + 原文前 600 字)` 十六进制的前 32 位。
 - 判定文件 `verdicts.jsonl`：每行 `{"id": "<事实 uuid>", "h": "<sha256(事实原句) 十六进制前 16 位>", "v": "pass|fail|unsure"}`，可以多带别的字段；同一事实以最后一行为准；事实原句改了，旧判定自动作废。
 
-## 接到 Claude Code
-
-项目里的 `.mcp.json`，用合起来的工具：
-
-```json
-{
-  "mcpServers": {
-    "memory": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/path/to/javmem-mcp/memory-mcp.js"],
-      "env": {
-        "MEMV2_TOKEN_FILE": "/path/to/tokens/bot_a.token",
-        "JAVIS_TOKEN_FILE": "/path/to/profiles/bot_a.env",
-        "MEMORY_LABELS_FILE": "/path/to/labels.json",
-        "MEMORY_AUDIENCE": "cc"
-      }
-    }
-  }
-}
-```
-
-或者分开用两个：
-
-```json
-{
-  "mcpServers": {
-    "memv2": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/path/to/javmem-mcp/memv2-mcp.js"],
-      "env": { "MEMV2_TOKEN_FILE": "/path/to/tokens/bot_a.token", "MEMV2_AUDIENCE": "cc" }
-    },
-    "javis": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/path/to/javmem-mcp/javis-mcp.js"],
-      "env": { "JAVIS_TOKEN_FILE": "/path/to/profiles/bot_a.env", "JAVIS_AUDIENCE": "cc" }
-    }
-  }
-}
-```
-
-## 接到 DeepSeek Harness（Tobs）
-
-- 每个 Bot 一个私有 MCP：命令 `node /path/to/memv2-mcp.js`，环境变量填令牌文件的路径。
-- 或者装配套插件 [javmem-dsh-plugin](https://github.com/xuxiaoxiang0721-tech/javmem-dsh-plugin)：按 Bot 编号自动挂工具，不用卡片。
-
 ## 测试
 
 ```bash
 node test/smoke.mjs
 ```
 
-不需要 memv2 和 Javis 在跑：测三个程序的握手、工具名单、主人名字、令牌缺失和服务没起来时的报错，以及合起来的工具在一个库出错时照样回答。
+不需要 memv2 和 Javis 在跑：测三个程序的握手（版本号）、工具名单、主人名字、令牌缺失和服务没起来时的报错、合起来的工具在一个库出错时照样回答，以及 `javmem/status` 的几种状态。GitHub Actions 在 Node 20、22、24 上各跑一遍。
 
 ## 安全
 
@@ -168,12 +198,10 @@ node test/smoke.mjs
 - 三个程序都不往标准输出打别的东西，只有 JSON-RPC 消息，不记查询内容。
 - 查询走本机或你指定的地址；Javis 的事实查询只按关键词，不调用嵌入模型。
 
+## 发版
+
+步骤见 [RELEASING.md](RELEASING.md)，更新记录见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 许可证
 
 MIT，见 [LICENSE](LICENSE)。
-
----
-
-## English summary
-
-Read-only stdio MCP servers for chat Bots: `memory-mcp.js`, one combined server over both stores with five tools (recall, search, search_raw, person, read; a fact both stores hold is listed once, a different wording sits next to memv2's, and items carry cross-check labels when `MEMORY_LABELS_FILE` is set), and the two single-store servers it builds on, `memv2-mcp.js` (memv2 fact memory over its HTTP read API) and `javis-mcp.js` (Javis, a Graphiti/Neo4j memory graph, through its own MCP endpoint). They store nothing themselves: memv2 and Javis must be running. SQLite, Graphiti and Neo4j underneath them are public, but memv2 and Javis themselves are not publicly released at the moment, and these servers talk to their own interfaces. No dependencies, Node 20+. Per-Bot partitions (one read-only memv2 client token per Bot; Javis accounts listed in a per-Bot profile), a hide list, a verdict filter for extracted facts, short Chinese tool text for small models. Configure with the environment variables above; tokens live in files, never in the environment. Smoke test: `node test/smoke.mjs`. A companion DeepSeek Harness plugin, [javmem-dsh-plugin](https://github.com/xuxiaoxiang0721-tech/javmem-dsh-plugin), registers these tools per Bot without per-Bot private MCP cards. Quick start: `git clone https://github.com/xuxiaoxiang0721-tech/javmem-mcp.git`, `node test/smoke.mjs`, then add `node memory-mcp.js` as a stdio server with `MEMV2_TOKEN_FILE` and `JAVIS_TOKEN_FILE` set. License: MIT.
