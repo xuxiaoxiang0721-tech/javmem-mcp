@@ -10,6 +10,13 @@
 
 This memory is called javmem: memv2 keeps facts (who, when, how much), Javis keeps the relations and timeline of people and things (Graphiti + Neo4j). javmem-mcp gives a model both as one tool: a fact both stores hold is listed once, a different wording is listed next to it and memv2 counts; every Bot queries with its own token and sees only its own share. The servers store nothing themselves; they only query the two stores for the model.
 
+## Why javmem
+
+1. **Built for personal Bots, so it can afford good models.** One person's conversations are nowhere near commercial data volumes, so javmem doesn't skimp on the model that extracts memory: the same person has to be recognised as the same person, relations linked correctly and events put in order, and the better the model, the more accurate it gets. If you'd rather pay nothing, zero-setup mode costs nothing at all.
+2. **Bring your past in one go.** Most memory plugins start remembering on the day you install them. javmem comes with an export prompt: paste it into a tool like Grok, ChatGPT or Claude, and it writes what it remembers and the topics you talked about into one package, imported in one go.
+3. **Two stores, each with its own job: the more it holds, the more it resembles a real person.** With the full backend, memv2 keeps what is true: facts, numbers, dates. The graph keeps who, when, where, and how things changed later. The original words are kept too, down to how someone phrases things. Outdated statements are marked as no longer valid, so it can tell what you thought then from what you think now, and where the two stores disagree it says so. The more memory builds up, the more faithfully it can reconstruct a real person: groundwork for a digital human.
+4. **Read-only, so a Bot can't rewrite your past.** Memory has only two ways in, both outside the model's hands: the Bot program itself packages new conversations and delivers them to the store, and you import your own history; the model can look things up but never write, so it can't slip a guess of its own into memory, and instructions smuggled in by a web page or another Bot can't make it delete or change what is remembered.
+
 ## Who it is for, and who it is not for
 
 For:
