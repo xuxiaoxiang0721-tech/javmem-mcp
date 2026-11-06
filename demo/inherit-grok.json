@@ -1,0 +1,35 @@
+好的，下面是第一段：
+
+```json
+{
+  "javmem_inherit": 1,
+  "tool": "Grok",
+  "exported_at": "2026-10-30",
+  "part": 1,
+  "facts": [
+    { "text": "小明对芒果过敏，吃了会起疹子", "when": "2026-05", "topic": "健康", "note": "" },
+    { "text": "小明喜欢周末早上去西湖边跑步", "topic": "习惯" },
+    { "text": "小明 2025 年和同事老陈一起去成都出过差", "when": "2025", "topic": "工作" }
+  ],
+  "conversations": []
+}
+```
+
+继续：
+
+```json
+{
+  "javmem_inherit": 1,
+  "tool": "Grok",
+  "exported_at": "2026-10-30",
+  "part": 2,
+  "facts": [
+    { "text": "小明想明年春天带全家去日本看樱花", "when": "去年冬天", "topic": "计划", "note": "具体哪个月没说" }
+  ],
+  "conversations": [
+    { "title": "买车", "when": "2026-08-12", "summary": "小明在比较两款电动车，最后决定等明年新款出来再买" }
+  ]
+}
+```
+
+（以上是我记得的全部内容。这些都是虚构的演示数据。）

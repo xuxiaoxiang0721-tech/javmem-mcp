@@ -143,6 +143,18 @@ claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_T
 - 只读打开；库文件还不存在时回答「还没有内容」，不报错。`javmem/status` 报有几个会话、几条对话、最近一次更新。
 - 库的读写模块是 `local-store.js`，写入方（DSH 插件的索引程序）和它共用。
 
+## 继承别的 AI 的记忆：javmem-inherit
+
+你在别的 AI 工具（Grok、Muse、Dot、ChatGPT 这类）里攒下的「它记得你」的东西，可以搬进 javmem，Bot 一上来就有过去：
+
+1. **拿提示词**：`npx -y -p javmem-mcp javmem-inherit prompt`（英文版加 `--en`），或者直接复制 [docs/inherit-prompt.md](docs/inherit-prompt.md)。
+2. **贴给那个 AI**：它按固定格式（JSON）把记得的事写出来，内容多就分几段。把回答整个复制下来存成一个文件，比如 `grok.json`；几段可以存在同一个文件里，前后的闲话和代码块标记不用删。
+3. **检查**：`javmem-inherit check grok.json`，只报几条事实、几段对话、哪里有问题，不打印内容。
+4. **导入**：用 DSH 插件的，把文件放进 `<DSH 主目录>/javmem/inherit/<Bot 名字或编号>/`，插件下次补录时导进这个 Bot 的本地库；单独用的，`javmem-inherit import grok.json --db <本地库文件>`，再用 `local-mcp.js` 查。
+5. 每条都标「继承自 Grok，某日导出」；同一个文件再导一次不会重复。
+
+继承来的记忆没有和原始对话核对过，工具说明会提醒模型讲明出处。
+
 ## 做了什么
 
 - **只读**：三个程序都只转发查询，不改 memv2 和 Javis 里的任何东西。

@@ -244,6 +244,39 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   ok('local store: five tools, Chinese words inside sentences, inherited marks, status, an empty store');
 }
 
+// javmem-inherit: the prompt; check and import of a made-up Grok package pasted in two parts with chatter around;
+// importing it again adds nothing; local-mcp shows it as inherited; something that is not a package is refused.
+{
+  const { spawnSync } = await import('node:child_process');
+  const cli = (...args) => spawnSync(process.execPath, [join(root, 'inherit.js'), ...args], { encoding: 'utf8', timeout: 30000 });
+  const zh = cli('prompt').stdout.trim();
+  const en = cli('prompt', '--en').stdout.trim();
+  assert.match(zh, /"javmem_inherit": 1/);
+  assert.match(en, /Please gather everything you remember about me/);
+  const doc = readFileSync(join(root, 'docs', 'inherit-prompt.md'), 'utf8').replace(/\r\n/g, '\n');
+  assert.ok(doc.includes(zh) && doc.includes(en), 'docs/inherit-prompt.md holds the prompts the CLI prints');
+  const pkg = join(root, 'demo', 'inherit-grok.json');
+  const checked = cli('check', pkg);
+  assert.equal(checked.status, 0);
+  assert.deepEqual(JSON.parse(checked.stdout), { tool: 'Grok', exported_at: '2026-10-30', facts: 4, conversations: 1, problems: [] });
+  const db = join(scratch, 'inherit.sqlite');
+  const first = JSON.parse(cli('import', pkg, '--db', db).stdout);
+  assert.equal(first.added, 5);
+  assert.equal(JSON.parse(cli('import', pkg, '--db', db).stdout).added, 0, 'the same package twice adds nothing');
+  const junk = join(scratch, 'junk.txt');
+  writeFileSync(junk, '这不是一个包');
+  const bad = cli('check', junk);
+  assert.equal(bad.status, 1);
+  assert.deepEqual(JSON.parse(bad.stdout).problems, ['no javmem package found (it needs "javmem_inherit": 1)']);
+  const call = (name, args) => ({ method: 'tools/call', params: { name, arguments: args } });
+  const a = await session('local-mcp.js', { JAVMEM_LOCAL_DB: db, MEMORY_OWNER: '小明' }, [{},
+    call('recall', { query: '芒果过敏' }), call('search', { query: '樱花' }), { method: 'javmem/status', params: {} }]);
+  assert.match(text(a.get(1).result), /\[2026-05\] 记下的事实：小明对芒果过敏，吃了会起疹子（健康）（继承自 Grok，2026-10-30 导出，消息号 m1）/);
+  assert.match(text(a.get(2).result), /小明想明年春天带全家去日本看樱花（时间：去年冬天）（计划）（拿不准：具体哪个月没说）/);
+  assert.match(a.get(3).result.stores[0].detail, /继承来的 5 条（1 个包）/);
+  ok('javmem-inherit: prompt, check, import once, shown as inherited, junk refused');
+}
+
 // scripts/eval.mjs on the demo questions: the counts it prints, and nothing but counts.
 {
   const { spawnSync } = await import('node:child_process');

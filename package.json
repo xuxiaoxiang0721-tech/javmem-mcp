@@ -18,7 +18,8 @@
     "memory-mcp": "memory-mcp.js",
     "memv2-mcp": "memv2-mcp.js",
     "javis-mcp": "javis-mcp.js",
-    "javmem-local": "local-mcp.js"
+    "javmem-local": "local-mcp.js",
+    "javmem-inherit": "inherit.js"
   },
   "files": [
     "memory-mcp.js",
@@ -26,10 +27,12 @@
     "javis-mcp.js",
     "local-store.js",
     "local-mcp.js",
+    "inherit.js",
     "demo.js",
     "demo/",
     "scripts/demo.mjs",
     "scripts/eval.mjs",
+    "docs/inherit-prompt.md",
     "README.md",
     "README.en.md",
     "CHANGELOG.md",

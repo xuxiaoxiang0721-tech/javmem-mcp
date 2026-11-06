@@ -143,6 +143,18 @@ No memv2, no Javis, no service to start: it reads one local store file (`JAVMEM_
 - It opens the store read-only; while the file does not exist yet it answers "nothing yet" instead of failing. `javmem/status` reports sessions, messages and the last update.
 - `local-store.js` reads and writes the store; the writer (the DSH plugin's indexer) shares it.
 
+## Memory inherited from other AIs: javmem-inherit
+
+What another AI tool (Grok, Muse, Dot, ChatGPT and the like) remembers about you can move into javmem, so a Bot starts with a past:
+
+1. **Get the prompt**: `npx -y -p javmem-mcp javmem-inherit prompt --en` (without `--en` in Chinese), or copy [docs/inherit-prompt.md](docs/inherit-prompt.md).
+2. **Paste it into that AI**: it writes what it remembers in a fixed form (JSON), in several parts when there is a lot. Copy the whole answer into one file, such as `grok.json`; several parts can share the file, and the chatter and code fences around them can stay.
+3. **Check**: `javmem-inherit check grok.json` reports facts, conversations and problems, never the text.
+4. **Import**: with the DSH plugin, put the file in `<DSH home>/javmem/inherit/<Bot name or id>/` and the plugin adds it to that Bot's local store on its next pass; on your own, `javmem-inherit import grok.json --db <local store file>`, then query it with `local-mcp.js`.
+5. Every item is marked 「继承自 Grok」 (inherited from Grok) with the export date; the same file imported again adds nothing.
+
+Inherited memory was never checked against the original conversations, and the tool text tells the model to name where it came from.
+
 ## What they do
 
 - **Read-only**: all three only forward queries and change nothing in memv2 or Javis.
