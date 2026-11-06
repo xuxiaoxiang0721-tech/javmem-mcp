@@ -308,7 +308,7 @@ npx -y javmem-mcp setup
 node test/smoke.mjs
 ```
 
-不需要 memv2 和 Javis 在跑：测三个程序的握手（版本号）、工具名单、主人名字、令牌缺失和服务没起来时的报错、合起来的工具在一个库出错时照样回答、`javmem/status` 的几种状态，以及演示数据上的 13 个工具。GitHub Actions 在 Node 20、22、24 上各跑一遍。截图用 `node scripts/screenshot.mjs` 重新生成（要本机有 Chrome 或 Edge）。
+不需要 memv2 和 Javis 在跑：测三个程序的握手（版本号）、工具名单、主人名字、令牌缺失和服务没起来时的报错、合起来的工具在一个库出错时照样回答、`javmem/status` 的几种状态，演示数据上的 13 个工具，还有本地库、继承包、接 Graphiti（假服务）、memv2 精简版（假模型）和安装向导。GitHub Actions 在 Node 20、22、24 上各跑一遍；没有 `node:sqlite` 的 Node（20，或 22.5 以前）跳过要 SQLite 的那几条，并写明跳过了几条。截图用 `node scripts/screenshot.mjs` 重新生成（要本机有 Chrome 或 Edge）。
 
 ## 安全
 

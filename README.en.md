@@ -308,7 +308,7 @@ The servers store no memory; they only query the two memory stores for the Bots.
 node test/smoke.mjs
 ```
 
-No memv2 or Javis needed: the three servers' handshake (with the version), tool lists, owner name, the errors for a missing token and a service that is down, the combined server answering when one store fails, the states of `javmem/status`, and all thirteen tools on the demo data. GitHub Actions runs it on Node 20, 22 and 24. `node scripts/screenshot.mjs` redraws the picture (it needs a local Chrome or Edge).
+No memv2 or Javis needed: the three servers' handshake (with the version), tool lists, owner name, the errors for a missing token and a service that is down, the combined server answering when one store fails, the states of `javmem/status`, all thirteen tools on the demo data, and the local store, inherited packages, the Graphiti backend (a stand-in server), memv2-lite (a stand-in model) and the setup wizard. GitHub Actions runs it on Node 20, 22 and 24; a Node without `node:sqlite` (20, or 22 before 22.5) skips the checks that need SQLite and says how many. `node scripts/screenshot.mjs` redraws the picture (it needs a local Chrome or Edge).
 
 ## Safety
 

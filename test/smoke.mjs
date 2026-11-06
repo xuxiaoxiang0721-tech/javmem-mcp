@@ -44,6 +44,10 @@ function session(script, env, requests) {
 const text = (result) => (result?.content || []).map((c) => c.text).join('\n');
 let passed = 0;
 const ok = (label) => { passed += 1; console.log('ok', label); };
+// node:sqlite (Node 22.5 or later) backs the local store, memv2-lite and the wizard; without it those checks are skipped.
+const SQLITE = await import('node:sqlite').then(() => true, () => false);
+let skipped = 0;
+const skip = (label) => { skipped += 1; console.log('skip', label, '(needs node:sqlite: Node 22.5 or later)'); };
 
 // memv2-mcp.js
 {
@@ -204,7 +208,8 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
 
 // local-mcp.js on a local store filled with made-up messages: the five tools, Chinese words inside sentences, the
 // marks for inherited memory, and javmem/status; a missing store answers "nothing yet" instead of failing.
-{
+if (!SQLITE) skip('local store');
+else {
   const { createRequire } = await import('node:module');
   const { LocalStore } = createRequire(import.meta.url)('../local-store.js');
   const db = join(scratch, 'local.sqlite');
@@ -246,7 +251,8 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
 
 // javmem-inherit: the prompt; check and import of a made-up Grok package pasted in two parts with chatter around;
 // importing it again adds nothing; local-mcp shows it as inherited; something that is not a package is refused.
-{
+if (!SQLITE) skip('javmem-inherit');
+else {
   const { spawnSync } = await import('node:child_process');
   const cli = (...args) => spawnSync(process.execPath, [join(root, 'inherit.js'), ...args], { encoding: 'utf8', timeout: 30000 });
   const zh = cli('prompt').stdout.trim();
@@ -281,7 +287,8 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
 // episodes, sends each once within the window and the day's budget, confirms them, sends again what the server lost;
 // javis-mcp.js with JAVIS_BACKEND=graphiti answers its four tools from Graphiti plus the local store, and the
 // combined server works on top of it.
-{
+if (!SQLITE) skip('Graphiti backend');
+else {
   const { createRequire } = await import('node:module');
   const req = createRequire(import.meta.url);
   const { LocalStore } = req('../local-store.js');
@@ -363,7 +370,8 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
 // extracts facts that quote their message (made-up quotes and numbers dropped), keeps inherited facts as they are
 // without a model call, uses the cheaper model on short stretches, marks the replaced fact superseded and stops at
 // the day's budget; memv2-mcp.js reads it unchanged, within its token's namespaces.
-{
+if (!SQLITE) skip('memv2-lite');
+else {
   const { createRequire } = await import('node:module');
   const req = createRequire(import.meta.url);
   const { LocalStore } = req('../local-store.js');
@@ -467,7 +475,8 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
 
 // The install wizard and the estimate (items 13 and 17): the four choices with what they cost, the quote before
 // anything is written, nothing written on a no; with a yes, each backend's files (a folder that stands alone).
-{
+if (!SQLITE) skip('setup wizard');
+else {
   const { spawnSync } = await import('node:child_process');
   const { existsSync, statSync } = await import('node:fs');
   const cli = (args, input) => spawnSync(process.execPath, [join(root, 'memory-mcp.js'), ...args], { encoding: 'utf8', timeout: 60000, input });
@@ -519,4 +528,4 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   ok('eval on the demo questions: combined 6/6, memv2 5/6, Javis 6/6, counts only');
 }
 
-console.log(`${passed} checks passed`);
+console.log(`${passed} checks passed${skipped ? `, ${skipped} skipped (no node:sqlite)` : ''}`);
