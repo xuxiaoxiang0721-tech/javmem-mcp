@@ -1,0 +1,30 @@
+{
+  "name": "two-memory-mcp",
+  "version": "0.1.0",
+  "description": "Read-only MCP servers for memv2 (fact memory) and Javis (Graphiti memory graph), written for chat Bots: per-Bot partitions, a hide list, a verdict filter and short Chinese results.",
+  "type": "commonjs",
+  "bin": {
+    "memv2-mcp": "memv2-mcp.js",
+    "javis-mcp": "javis-mcp.js"
+  },
+  "files": [
+    "memv2-mcp.js",
+    "javis-mcp.js",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "mcp",
+    "memory",
+    "memv2",
+    "graphiti",
+    "javis",
+    "deepseek-harness",
+    "tobs"
+  ]
+}

@@ -1,0 +1,7 @@
+node_modules/
+*.log
+*.token
+.env
+.env.*
+hidden.json
+verify/
