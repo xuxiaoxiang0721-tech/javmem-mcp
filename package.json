@@ -2,6 +2,7 @@
   "name": "javmem-mcp",
   "version": "0.2.0",
   "description": "Read-only MCP servers for memv2 (fact memory) and Javis (Graphiti memory graph), written for chat Bots: one combined server with five tools and cross-check labels, plus the two single-store servers; per-Bot partitions, a hide list, a verdict filter and short Chinese results.",
+  "license": "MIT",
   "type": "commonjs",
   "bin": {
     "memory-mcp": "memory-mcp.js",
@@ -12,7 +13,8 @@
     "memory-mcp.js",
     "memv2-mcp.js",
     "javis-mcp.js",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "test": "node test/smoke.mjs"
