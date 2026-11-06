@@ -4,10 +4,35 @@
 
 | 程序 | 接的是 | 工具 |
 |---|---|---|
+| `memory-mcp.js` | **两个库合起来的一个工具**（推荐） | `recall`、`search`、`search_raw`、`person`、`read` |
 | `memv2-mcp.js` | memv2：事实记忆服务（HTTP 读接口） | `recall`、`search`、`search_raw`、`read_record` |
 | `javis-mcp.js` | Javis：Graphiti + Neo4j 的记忆图谱（通过它自带的 MCP 端点） | `search_memory`、`get_entity`、`find_sessions`、`get_conversation` |
 
-两个程序都走 stdio，没有依赖，只用 Node 自带的模块（Node 20 以上）。工具说明和返回内容是中文，按小模型的上下文写得很短。
+三个程序都走 stdio，没有依赖，只用 Node 自带的模块（Node 20 以上）。工具说明和返回内容是中文，按小模型的上下文写得很短。
+
+## 合起来的工具 memory-mcp.js
+
+一个 MCP 服务同时查两个库，给 Bot 五个工具，代替分开的八个：
+
+| 工具 | 做什么 |
+|---|---|
+| `recall` | 按这一轮的话题取回 memv2 里相关的事实；两个库都记了的标「图库也有」 |
+| `search` | 两个库一起查：先列 memv2 的事实（事实、金额以它为准），再列图库里的人和关系、时间线；两个库都记了的只列一次，说法不同的在 memv2 那条下面写「图库说：…」 |
+| `search_raw` | 按关键词在两个库的原文里找，同一句话只列一行，带记录号和对话号 |
+| `person` | 图库里这个人的全部关系（按时间，名字要对得上），加上 memv2 里关于他的事实（按时间） |
+| `read` | 给记录号读 memv2 的一条记录，或给对话号分页读图库的整段对话 |
+
+- 它直接引用同目录的 `memv2-mcp.js` 和 `javis-mcp.js`，用它们的查询和过滤（分区、隐藏名单、事实核对），所以要同时配好两边的设置（`MEMV2_*`、`JAVIS_*`、`MEMORY_*`）。
+- 一个库出错或没配，另一个照样回答，回复里说清哪个没查成。
+- 标签：设了 `MEMORY_LABELS_FILE` 就给每条标上两个库的对照结果。文件格式：
+
+  ```json
+  {"version": 1, "memv2": {"<item_id>": {"l": "两边一致", "same": ["<javis uuid>"]}},
+   "javis": {"<uuid>": {"l": "只在图库"}}}
+  ```
+
+  `l` 是 `两边一致`、`两边不同`（`diff` 列出说法不同的那条）、`只在 memv2`、`只在图库` 之一。这个文件由你自己的对照程序生成，只放编号和标签，不放内容；没有这个文件就不标。
+- `MEMORY_AUDIENCE=cc`（或任一边的 `*_AUDIENCE=cc`）：给 Claude Code 用，工具标成只读。
 
 配套的 DeepSeek Harness（Tobs）插件 [dsh-plugin-two-memory](../dsh-plugin-two-memory) 按 Bot 把这两组工具挂上去，不用给每个 Bot 单独接私有 MCP。
 
@@ -66,7 +91,27 @@
 
 ## 接到 Claude Code
 
-项目里的 `.mcp.json`：
+项目里的 `.mcp.json`，用合起来的工具：
+
+```json
+{
+  "mcpServers": {
+    "memory": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/path/to/two-memory-mcp/memory-mcp.js"],
+      "env": {
+        "MEMV2_TOKEN_FILE": "/path/to/tokens/bot_a.token",
+        "JAVIS_TOKEN_FILE": "/path/to/profiles/bot_a.env",
+        "MEMORY_LABELS_FILE": "/path/to/labels.json",
+        "MEMORY_AUDIENCE": "cc"
+      }
+    }
+  }
+}
+```
+
+或者分开用两个：
 
 ```json
 {
@@ -98,7 +143,7 @@
 node test/smoke.mjs
 ```
 
-不需要 memv2 和 Javis 在跑：测握手、工具名单、主人名字、令牌缺失和服务没起来时的报错。
+不需要 memv2 和 Javis 在跑：测三个程序的握手、工具名单、主人名字、令牌缺失和服务没起来时的报错，以及合起来的工具在一个库出错时照样回答。
 
 ## 安全
 
@@ -114,4 +159,4 @@ node test/smoke.mjs
 
 ## English summary
 
-Two read-only stdio MCP servers for chat Bots: `memv2-mcp.js` (memv2 fact memory over its HTTP read API) and `javis-mcp.js` (Javis, a Graphiti/Neo4j memory graph, through its own MCP endpoint). No dependencies, Node 20+. Per-Bot partitions (one read-only memv2 client token per Bot; Javis accounts listed in a per-Bot profile), a hide list, a verdict filter for extracted facts, short Chinese tool text for small models. Configure with the environment variables above; tokens live in files, never in the environment. Smoke test: `node test/smoke.mjs`. A companion DeepSeek Harness plugin, `dsh-plugin-two-memory`, registers both tool sets per Bot without per-Bot private MCP cards. License: to be decided.
+Read-only stdio MCP servers for chat Bots: `memory-mcp.js`, one combined server over both stores with five tools (recall, search, search_raw, person, read; a fact both stores hold is listed once, a different wording sits next to memv2's, and items carry cross-check labels when `MEMORY_LABELS_FILE` is set), and the two single-store servers it builds on, `memv2-mcp.js` (memv2 fact memory over its HTTP read API) and `javis-mcp.js` (Javis, a Graphiti/Neo4j memory graph, through its own MCP endpoint). No dependencies, Node 20+. Per-Bot partitions (one read-only memv2 client token per Bot; Javis accounts listed in a per-Bot profile), a hide list, a verdict filter for extracted facts, short Chinese tool text for small models. Configure with the environment variables above; tokens live in files, never in the environment. Smoke test: `node test/smoke.mjs`. A companion DeepSeek Harness plugin, `dsh-plugin-two-memory`, registers both tool sets per Bot without per-Bot private MCP cards. License: to be decided.

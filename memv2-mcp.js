@@ -199,15 +199,21 @@ function degradedNote(result) {
   return result.degraded ? `（memv2 这次是降级结果：${result.degradation_reason || '原因不明'}，可能不全）\n` : '';
 }
 
-async function recall(args) {
+// recall's items with their ids, before they are put into lines (memory-mcp.js uses these).
+async function recallItems(args) {
   const query = String(args.query || '').trim();
   if (!query) throw new UserError('query 不能为空。');
   const maxChars = intIn(args.max_chars, 200, 6000, 1500);
   const result = await memv2('POST', '/api/v1/recall',
     { query: query.slice(0, 4000), max_chars: maxChars, timeout: 10, ...scope() }, 20000);
+  return { result, maxChars, items: (result.semantic && result.semantic.items) || [] };
+}
+
+async function recall(args) {
+  const { result, maxChars, items } = await recallItems(args);
   const lines = [];
   let total = 0;
-  for (const item of (result.semantic && result.semantic.items) || []) {
+  for (const item of items) {
     const line = memoryLine(item);
     if (total + line.length > maxChars) break;
     lines.push(line);
@@ -217,7 +223,8 @@ async function recall(args) {
   return `${degradedNote(result)}${GUIDE}\n\n${lines.join('\n')}`;
 }
 
-async function search(args) {
+// search's items with their ids, before they are put into lines (memory-mcp.js uses these).
+async function searchItems(args) {
   const payload = {
     query: String(args.query || '').slice(0, 4000),
     limit: intIn(args.limit, 1, 100, 20),
@@ -230,13 +237,20 @@ async function search(args) {
   }
   if (!payload.query.trim() && !payload.entity) throw new UserError('query 和 entity 至少要给一个。');
   const result = await memv2('POST', '/api/v1/search', payload, 40000);
-  const items = (result.semantic && result.semantic.items) || [];
+  return { result, items: (result.semantic && result.semantic.items) || [] };
+}
+
+const recordKeys = (item) => (item.core_sources || []).map((s) => s && s.core_record_key).filter(Boolean);
+
+function searchLine(item) {
+  const keys = recordKeys(item);
+  return memoryLine(item) + (keys.length ? `  记录号：${keys.join('，')}` : '');
+}
+
+async function search(args) {
+  const { result, items } = await searchItems(args);
   if (!items.length) return `${degradedNote(result)}没有找到。`;
-  const lines = items.map((item) => {
-    const keys = (item.core_sources || []).map((s) => s && s.core_record_key).filter(Boolean);
-    return memoryLine(item) + (keys.length ? `  记录号：${keys.join('，')}` : '');
-  });
-  return `${degradedNote(result)}${lines.join('\n')}`;
+  return `${degradedNote(result)}${items.map(searchLine).join('\n')}`;
 }
 
 function clip(value, n) {
@@ -260,7 +274,8 @@ function excerpt(item, n) {
 const rawQuery = (q, limit) => memv2('POST', '/api/v1/query',
   { query: q, mode: 'raw', limit, max_chars: 12000, timeout: 20, ...scope() }, 40000);
 
-async function searchRaw(args) {
+// The raw hits, best first, before they are put into lines (memory-mcp.js uses these).
+async function rawHits(args) {
   const query = String(args.query || '').trim();
   if (!query) throw new UserError('query 不能为空。');
   if (query.length > 200) throw new UserError('query 太长了，最多 200 字。');
@@ -284,6 +299,13 @@ async function searchRaw(args) {
   }
   const hits = [...byKey.values()].sort((a, b) => (b.words.size - a.words.size) || (a.order - b.order)).slice(0, limit);
   const degraded = results.map(degradedNote).find(Boolean) || '';
+  return { hits, words, multi, degraded };
+}
+
+const rawDay = (item) => String(item.occurred_at || item.observed_at || '').slice(0, 10) || '日期不明';
+
+async function searchRaw(args) {
+  const { hits, words, multi, degraded } = await rawHits(args);
   if (!hits.length) return `${degraded}原文里没有找到这些关键词。可以换个词再找。`;
   const head = '找到的原话（每条只截一小段，要看全文用 read_record 按记录号读）：'
     + (multi && hits[0].words.size < words.length ? '\n没有同时含这几个词的原文，下面每条只含其中一部分：' : '');
@@ -291,9 +313,8 @@ async function searchRaw(args) {
   let total = head.length + RAW_NOTE.length + 40;
   let shown = 0;
   for (const { item, words: has } of hits) {
-    const day = String(item.occurred_at || item.observed_at || '').slice(0, 10) || '日期不明';
     const part = multi && has.size < words.length ? `（只含关键词：${words.filter((w) => has.has(w)).join('、')}）` : '';
-    const line = `${shown + 1}. [${day}] ${item.role || ''}：${excerpt(item, 300)}  记录号：${item.record_key}${part}`;
+    const line = `${shown + 1}. [${rawDay(item)}] ${item.role || ''}：${excerpt(item, 300)}  记录号：${item.record_key}${part}`;
     if (total + line.length + 1 > MAX_TEXT) break;
     out.push(line);
     total += line.length + 1;
@@ -368,21 +389,30 @@ async function handle(line) {
   if (isRequest) send({ jsonrpc: '2.0', id: msg.id, result });
 }
 
-// When the client closes stdin, answer what is still running, then exit.
-let pending = 0;
-let closing = false;
-const rl = readline.createInterface({ input: process.stdin });
-rl.on('line', (line) => {
-  if (!line.trim()) return;
-  pending += 1;
-  handle(line)
-    .catch((err) => process.stderr.write(`memv2-mcp: ${err.stack || err}\n`))
-    .finally(() => {
-      pending -= 1;
-      if (closing && pending === 0) process.exit(0);
-    });
-});
-rl.on('close', () => {
-  closing = true;
-  if (pending === 0) process.exit(0);
-});
+// Run directly: serve MCP over stdio. Required by memory-mcp.js: only lend it the functions below.
+if (require.main === module) {
+  // When the client closes stdin, answer what is still running, then exit.
+  let pending = 0;
+  let closing = false;
+  const rl = readline.createInterface({ input: process.stdin });
+  rl.on('line', (line) => {
+    if (!line.trim()) return;
+    pending += 1;
+    handle(line)
+      .catch((err) => process.stderr.write(`memv2-mcp: ${err.stack || err}\n`))
+      .finally(() => {
+        pending -= 1;
+        if (closing && pending === 0) process.exit(0);
+      });
+  });
+  rl.on('close', () => {
+    closing = true;
+    if (pending === 0) process.exit(0);
+  });
+}
+
+module.exports = {
+  GUIDE, RAW_NOTE, MAX_TEXT, UserError, FOR_CC, OWNER, FIX_HOW,
+  memoryLine, searchLine, recordKeys, degradedNote, clip, excerpt, rawDay, intIn,
+  recallItems, searchItems, rawHits, recall, search, searchRaw, readRecord,
+};

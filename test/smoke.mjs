@@ -78,4 +78,32 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   ok('javis: handshake, 4 tools, default owner, service down');
 }
 
+// memory-mcp.js (the combined server)
+{
+  const token = join(scratch, 'memv2.token');
+  const profile = join(scratch, 'bot.env');
+  const env = { MEMV2_URL: CLOSED, MEMV2_TOKEN_FILE: token, JAVIS_URL: `${CLOSED}/mcp`, JAVIS_TOKEN_FILE: profile };
+  const a = await session('memory-mcp.js', env, [
+    {}, { method: 'tools/list', params: {} },
+    { method: 'tools/call', params: { name: 'search', arguments: { query: 'x' } } },
+    { method: 'tools/call', params: { name: 'read', arguments: {} } },
+    { method: 'tools/call', params: { name: 'read', arguments: { record_key: 'a', session_id: 'b' } } },
+    { method: 'tools/call', params: { name: 'person', arguments: { name: 'x' } } }]);
+  assert.deepEqual(a.get(1).result.tools.map((t) => t.name), ['recall', 'search', 'search_raw', 'person', 'read']);
+  assert.match(a.get(0).result.instructions, /同时查 memv2（用户的事实记忆）和图库/);
+  assert.equal(a.get(2).result.isError, true);
+  assert.match(text(a.get(2).result), /两个库这次都没查成.*memv2 没在运行.*Javis 没在运行/s);
+  assert.match(text(a.get(3).result), /只给一个/);
+  assert.match(text(a.get(4).result), /只给一个/);
+  assert.equal(a.get(5).result.isError, true);
+  ok('memory: handshake, 5 tools, both stores down named, read takes one id');
+
+  // One store configured wrongly, the other only down: the answer names both, and is not a crash.
+  const b = await session('memory-mcp.js', { ...env, JAVIS_TOKEN_FILE: '' }, [
+    {}, { method: 'tools/call', params: { name: 'search_raw', arguments: { query: 'x' } } }]);
+  assert.match(text(b.get(1).result), /memv2 没在运行/);
+  assert.match(text(b.get(1).result), /JAVIS_TOKEN_FILE/);
+  ok('memory: each store\'s own error is shown');
+}
+
 console.log(`${passed} checks passed`);

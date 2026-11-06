@@ -347,7 +347,7 @@ const CN_DIGIT = { 零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 
 const CN_UNIT = { 十: 10, 百: 100, 千: 1000 };
 const CN_BIG = { 万: 10000, 亿: 100000000 };
 // Speaker and assistant names that a fact uses although the conversation says "I" or "you".
-const NAME_STOP = new Set(['user', 'assistant', OWNER.toLowerCase(),
+const NAME_STOP = new Set(['user', 'assistant', OWNER.trim().toLowerCase(),
   ...String(process.env.MEMORY_SPEAKERS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)]);
 
 // Values of a run of Chinese numerals, plus the value before a trailing 万/亿 ("一千万" also gives 1000).
@@ -476,7 +476,8 @@ function episodeMap(data) {
   return byEpisode;
 }
 
-async function searchMemory(args) {
+// The facts search_memory would show, with their ids, sources and check labels (memory-mcp.js uses these).
+async function searchFacts(args) {
   const hide = hidden();
   const { sources } = profile();
   const limit = intIn(args.limit, 1, 20, 8);
@@ -494,20 +495,26 @@ async function searchMemory(args) {
     if (ss) items.push({ f, sessions: ss });
   }
   const { kept, dropped } = await screen(items);
-  const shown = kept.slice(0, limit);
+  return { shown: kept.slice(0, limit), dropped };
+}
+
+function factLine({ f, sessions, label }, i, mark = '') {
+  const ents = [f.source_node_uuid, f.target_node_uuid].filter(Boolean).join('、');
+  const from = sessions.slice(0, 2).map(session).join('；');
+  return `${i + 1}. ${clip(f.fact, 300)}（${when(f)}）${label}${mark}\n   实体号：${ents || '无'}`
+    + (from ? `\n   来源：${from}` : '');
+}
+
+async function searchMemory(args) {
+  const { shown, dropped } = await searchFacts(args);
   if (!shown.length) {
     return `Javis 里没有找到相关的事实。${droppedNote(dropped)}可以换个说法，或用 find_sessions 按关键词找原话。`;
   }
-  const lines = shown.map(({ f, sessions, label }, i) => {
-    const ents = [f.source_node_uuid, f.target_node_uuid].filter(Boolean).join('、');
-    const from = sessions.slice(0, 2).map(session).join('；');
-    return `${i + 1}. ${clip(f.fact, 300)}（${when(f)}）${label}\n   实体号：${ents || '无'}`
-      + (from ? `\n   来源：${from}` : '');
-  });
-  return fit(GUIDE, lines, droppedNote(dropped));
+  return fit(GUIDE, shown.map((it, i) => factLine(it, i)), droppedNote(dropped));
 }
 
-async function getEntity(args) {
+// One entity and the relations get_entity would show, with check labels (memory-mcp.js uses these).
+async function entityFacts(args) {
   const hide = hidden();
   const { sources } = profile();
   const uuid = text(args, 'entity_uuid', 200);
@@ -523,21 +530,27 @@ async function getEntity(args) {
     if (ss) items.push({ f, sessions: ss });
   }
   const { kept, dropped } = await screen(items);
-  const facts = kept.slice(0, limit);
+  return { entity: e, facts: kept.slice(0, limit), dropped, sources };
+}
+
+function relationLine({ f, label }, i, mark = '') {
+  const o = f.other_entity || {};
+  return `${i + 1}. ${clip(f.fact, 300)}（${when(f)}）${label}${mark}对方：${clip(o.name || '不明', 40)}（实体号 ${o.uuid || '无'}）`;
+}
+
+async function getEntity(args) {
+  const { entity: e, facts, dropped, sources } = await entityFacts(args);
   // A summary mixes every account's conversations, so a Bot limited to some accounts gets the relations only.
   const summary = sources ? '' : `：${clip(e.summary || '没有摘要', 600)}`;
   const head = `${GUIDE}\n\n${clip(e.name || '（无名）', 80)}${summary}\n关系（含已失效的）：`;
   if (!facts.length) {
     return `${head}\n${sources ? '这个 Bot 能看的范围里' : ''}没有记录到关系。${droppedNote(dropped)}`;
   }
-  const lines = facts.map(({ f, label }, i) => {
-    const o = f.other_entity || {};
-    return `${i + 1}. ${clip(f.fact, 300)}（${when(f)}）${label}对方：${clip(o.name || '不明', 40)}（实体号 ${o.uuid || '无'}）`;
-  });
-  return fit(head, lines, droppedNote(dropped));
+  return fit(head, facts.map((it, i) => relationLine(it, i)), droppedNote(dropped));
 }
 
-async function findSessions(args) {
+// The raw-text hits find_sessions would show (memory-mcp.js uses these).
+async function findMatches(args) {
   const hide = hidden();
   const { sources } = profile();
   const limit = intIn(args.limit, 1, 20, 8);
@@ -545,13 +558,19 @@ async function findSessions(args) {
     query: text(args, 'query', 200),
     limit: wanted(limit, hide.any || !!sources, 50),
   }, 60000);
-  const matches = (data.matches || [])
+  return (data.matches || [])
     .filter((m) => !hide.sessions.has(m.session_id) && !hide.messages.has(fingerprint(m.role, m.timestamp, m.excerpt)))
     .filter((m) => !sources || sources.has(m.provider))
     .slice(0, limit);
+}
+
+const matchSession = (m) => session({ id: m.session_id, title: m.title, provider: m.provider });
+
+async function findSessions(args) {
+  const matches = await findMatches(args);
   if (!matches.length) return '以前的对话原文里没有找到这些关键词。可以换个词再找。';
   const lines = matches.map((m, i) => `${i + 1}. [${day(m.timestamp) || '日期不明'}] `
-    + `${session({ id: m.session_id, title: m.title, provider: m.provider })} ${m.role || ''}：${clip(m.excerpt, 300)}`);
+    + `${matchSession(m)} ${m.role || ''}：${clip(m.excerpt, 300)}`);
   return fit('找到的原话（每条只截一小段，要看全文用 get_conversation 按对话号读）：', lines, RAW_NOTE);
 }
 
@@ -651,21 +670,30 @@ async function handle(line) {
   if (isRequest) send({ jsonrpc: '2.0', id: msg.id, result });
 }
 
-// When the client closes stdin, answer what is still running, then exit.
-let pending = 0;
-let closing = false;
-const rl = readline.createInterface({ input: process.stdin });
-rl.on('line', (line) => {
-  if (!line.trim()) return;
-  pending += 1;
-  handle(line)
-    .catch((err) => process.stderr.write(`javis-mcp: ${err.stack || err}\n`))
-    .finally(() => {
-      pending -= 1;
-      if (closing && pending === 0) process.exit(0);
-    });
-});
-rl.on('close', () => {
-  closing = true;
-  if (pending === 0) process.exit(0);
-});
+// Run directly: serve MCP over stdio. Required by memory-mcp.js: only lend it the functions below.
+if (require.main === module) {
+  // When the client closes stdin, answer what is still running, then exit.
+  let pending = 0;
+  let closing = false;
+  const rl = readline.createInterface({ input: process.stdin });
+  rl.on('line', (line) => {
+    if (!line.trim()) return;
+    pending += 1;
+    handle(line)
+      .catch((err) => process.stderr.write(`javis-mcp: ${err.stack || err}\n`))
+      .finally(() => {
+        pending -= 1;
+        if (closing && pending === 0) process.exit(0);
+      });
+  });
+  rl.on('close', () => {
+    closing = true;
+    if (pending === 0) process.exit(0);
+  });
+}
+
+module.exports = {
+  GUIDE, RAW_NOTE, MAX_TEXT, HIDDEN_LINE, UserError, FOR_CC, OWNER, FIX_HOW,
+  clip, day, when, session, matchSession, fit, droppedNote, factLine, relationLine, intIn,
+  searchFacts, entityFacts, findMatches, searchMemory, getEntity, findSessions, getConversation,
+};
