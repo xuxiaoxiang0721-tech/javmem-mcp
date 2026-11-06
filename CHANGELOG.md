@@ -1,6 +1,6 @@
 # 更新记录 / Changelog
 
-## 0.3.0（未发布 / unreleased）
+## 0.3.0（2026-11-06）
 
 - 三个服务在 MCP 握手里报的版本号，改成读同目录的 `package.json`（以前写死，`memory-mcp.js` 还报 0.1.0）。
 - 第一次发 npm：包名 `javmem-mcp`；新增命令名 `javmem-mcp`（就是合起来的 `memory-mcp.js`），所以 `npx -y javmem-mcp` 就能起服务。

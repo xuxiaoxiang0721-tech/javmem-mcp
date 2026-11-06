@@ -1,7 +1,7 @@
 {
   "name": "javmem-mcp",
   "version": "0.3.0",
-  "description": "Read-only MCP servers for memv2 (fact memory) and Javis (Graphiti memory graph), written for chat Bots: one combined server with five tools and cross-check labels, plus the two single-store servers; per-Bot partitions, a hide list, a verdict filter and short Chinese results.",
+  "description": "javmem: per-Bot memory for chat Bots and Claude Code. MCP servers over a zero-setup local store (Chinese full-text), a small public fact store (memv2-lite) and the official Graphiti graph, chosen at install with a quote and a daily token cap; import memory from other AIs; read-only tools with sources and cross-check marks.",
   "license": "MIT",
   "author": "xuxiaoxiang0721-tech",
   "homepage": "https://github.com/xuxiaoxiang0721-tech/javmem-mcp#readme",
@@ -61,6 +61,9 @@
     "graphiti",
     "javis",
     "deepseek-harness",
-    "tobs"
+    "tobs",
+    "sqlite",
+    "personal-ai",
+    "claude-code"
   ]
 }
