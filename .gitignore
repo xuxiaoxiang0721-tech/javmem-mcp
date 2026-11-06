@@ -6,3 +6,4 @@ node_modules/
 hidden.json
 verify/
 dist/
+!.env.example
