@@ -1,0 +1,9 @@
+[
+ { "id": "demo-1", "question": "小雨的游泳课学费交了多少？", "keywords": "游泳课 学费", "expected": "2400" },
+ { "id": "demo-2", "question": "小雨现在每周哪天上游泳课？", "keywords": "游泳课", "expected": "周三" },
+ { "id": "demo-3", "question": "老陈什么时候调去深圳？", "keywords": "老陈 深圳", "expected": "12 月" },
+ { "id": "demo-4", "question": "我和老陈一起去哪里出过差？", "keywords": "老陈 出差", "expected": "成都" },
+ { "id": "demo-5", "question": "我对什么水果过敏？", "keywords": "过敏", "expected": "芒果" },
+ { "id": "demo-6", "question": "十一月全家去哪里玩？", "keywords": "11 月 出游", "expected": "千岛湖" },
+ { "id": "demo-7", "question": "小雨拿过游泳比赛冠军吗？", "keywords": "冠军", "must_not_mention": "2019" }
+]

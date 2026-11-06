@@ -202,4 +202,19 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   ok('demo backend: thirteen tools on made-up data, marks, the dropped fact, per-Bot filters');
 }
 
+// scripts/eval.mjs on the demo questions: the counts it prints, and nothing but counts.
+{
+  const { spawnSync } = await import('node:child_process');
+  const r = spawnSync(process.execPath, [join(root, 'scripts', 'eval.mjs'), '--demo'], { encoding: 'utf8', timeout: 60000 });
+  assert.equal(r.status, 0, r.stderr);
+  const summary = JSON.parse(r.stdout.trim().split('\n').pop());
+  assert.deepEqual(summary.answered, { combined: 6, memv2: 5, javis: 6, either: 6 });
+  assert.equal(summary.graded, 6);
+  assert.deepEqual(summary.quiet, { asked: 1, keptQuiet: 1 });
+  assert.equal(summary.toolErrors, 0);
+  assert.equal(summary.labels.agreeWhereBothHold, 80);
+  assert.ok(!/小雨|老陈|芒果/.test(r.stdout), 'eval prints counts, never answers');
+  ok('eval on the demo questions: combined 6/6, memv2 5/6, Javis 6/6, counts only');
+}
+
 console.log(`${passed} checks passed`);

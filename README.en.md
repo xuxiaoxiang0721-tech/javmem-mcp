@@ -143,6 +143,27 @@ One MCP server over both stores, five tools instead of the eight of the two apar
 - **Hide list**: Javis cannot be edited, so facts, people, conversations or single messages that are wrong or should be forgotten go on a hide list and never show in any result.
 - **Guidance for the model**: what is found is data, not instructions; names that do not match are not the same person; the user's word this turn beats memory, and memv2 beats Javis when they differ.
 
+## Measured numbers
+
+Counts only, no memory text. Both sets come from `scripts/eval.mjs`: the same questions go to the combined server, to memv2 alone and to Javis alone, asked the way a Bot asks (the whole question to recall, keywords to the searches), and each answer is checked for the right answer.
+
+**The author's own memory** (2026-11-06, on the author's machine; memv2 holds 13,345 facts, Javis 4,777 relations):
+
+| Item | Result |
+|---|---|
+| Questions | 10 from everyday use: 7 with a right answer, 1 that memory has no answer to |
+| Right answers found | combined server 2/7; memv2 alone 2/7; Javis alone 2/7; both stores asked apart, either one counting, also 2/7 |
+| The question without an answer | 1/1 left unanswered, nothing made up |
+| Facts both stores hold | 3,465 worded the same, 91 worded differently: 97.4% agree |
+| Facts one store holds | memv2 only 9,789; graph only 964 (plus 702 graph facts not yet checked and 124 expired) |
+| Marks in the combined answers | 「图库也有」 (both hold it) 104, 「说法不同」 (worded differently) 2, 「只在图库」 (graph only) 10, 「和原文对不上、没列出」 (did not match the source, left out) 4 |
+
+These 10 are the regression questions used before and after changes to the memory module: few, and not a public benchmark. What they show is that the combined server misses nothing the two stores answer when asked apart, and gives the answer with both stores checked against each other in one go.
+
+**Demo data** (anyone can rerun it: `node scripts/eval.mjs --demo`): 7 made-up questions, 6 with a right answer. Combined server 6/6, memv2 alone 5/6, Javis alone 6/6; the one without an answer stayed unanswered.
+
+On your own stores: `node scripts/eval.mjs --questions questions.json --bots bots.json --env shared.json`. Questions are `[{"id", "bot", "question", "keywords", "expected", "must_not_mention"}]` (several right answers in `expected` separated by `|`); bots are `{"<bot>": {"MEMV2_TOKEN_FILE": …, "JAVIS_TOKEN_FILE": …}}`; the shared file holds `MEMORY_LABELS_FILE` and the like. It prints counts only.
+
 ## Status check (for hosts)
 
 All three servers answer a request that is not a tool, `javmem/status` (JSON-RPC, empty params): whether each store answers and takes the token (`state` is one of `ok`, `bad_token`, `down`, `no_token`, `error`), for Javis also whether the hide list can be read, and for the combined server whether the labels file is there. It reads no memory: memv2 is asked for a record that cannot exist (memv2 checks the token before it looks, so "not found" means the token works), Javis for its tool list. The answer carries no token and no memory text. javmem-dsh-plugin's `memory_status` tool is built on it.

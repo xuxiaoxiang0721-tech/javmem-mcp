@@ -8,6 +8,7 @@
 - 状态检查：三个程序都认 `javmem/status` 请求（不是工具），回答每个库连不连得上、令牌能不能用，不读记忆，不带令牌。
 - README：开头一句话说清是什么，写明适合谁、不适合谁，接 Claude Code 的一条命令（`claude mcp add … -- npx -y javmem-mcp`）；英文版 `README.en.md` 和中文版内容对等；npm、CI、许可证徽章；CI 在 Node 20、22、24 上跑测试。
 - 演示数据：`MEMV2_URL=demo`、`JAVIS_URL=demo` 时读包里自带的虚构数据（`demo.js`、`demo/`），13 个工具都能答，不要令牌；`node scripts/demo.mjs` 把五个工具各问一遍；README 配了截图（`scripts/screenshot.mjs` 生成）。
+- 实测数字：`scripts/eval.mjs` 用同一批题比较合起来的工具和单库，只打印计数；README 写了作者记忆库上的结果（2/7 与单库相同，两库都记的事实 97.4% 说法一致）和演示数据上的结果。
 
 English:
 
@@ -17,6 +18,7 @@ English:
 - Status check: all three servers answer a `javmem/status` request (not a tool) with whether each store answers and takes the token; it reads no memory and carries no token.
 - README: a one-line pitch, who it is for and not for, one command for Claude Code (`claude mcp add … -- npx -y javmem-mcp`); `README.en.md` in English with the same content as the Chinese one; npm, CI and licence badges; CI runs the tests on Node 20, 22 and 24.
 - Demo data: with `MEMV2_URL=demo` and `JAVIS_URL=demo` the servers answer from made-up data in the package (`demo.js`, `demo/`), all thirteen tools, no token; `node scripts/demo.mjs` asks each of the five once; the README has a picture (made by `scripts/screenshot.mjs`).
+- Measured numbers: `scripts/eval.mjs` compares the combined server with each store alone on the same questions and prints counts only; the README has the results on the author's memory (2/7, the same as either store; 97.4% of facts both stores hold agree) and on the demo data.
 
 ## 0.2.0
 

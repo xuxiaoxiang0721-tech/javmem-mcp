@@ -26,6 +26,7 @@
     "demo.js",
     "demo/",
     "scripts/demo.mjs",
+    "scripts/eval.mjs",
     "README.md",
     "README.en.md",
     "CHANGELOG.md",
@@ -34,7 +35,8 @@
   "scripts": {
     "test": "node test/smoke.mjs",
     "pack": "node scripts/pack.mjs",
-    "demo": "node scripts/demo.mjs"
+    "demo": "node scripts/demo.mjs",
+    "eval": "node scripts/eval.mjs"
   },
   "engines": {
     "node": ">=20"
