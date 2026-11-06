@@ -383,7 +383,7 @@ async function status() {
         ...out, state: 'ok', backend: 'memv2-lite',
         detail: `记录 ${n(s.records)} 条，事实 ${n(s.items)} 条（另有 ${n(s.superseded)} 条已被取代），排队 ${n(s.windows.pending)} 段`
           + `${s.windows.failed ? `，失败 ${n(s.windows.failed)} 段` : ''}；今天抽取用了 ${n(s.today.tokens)} token`
-          + `${cap ? `（上限 ${n(cap)}${s.paused === 'budget' ? '，已到上限，明天接着抽' : ''}）` : ''}`,
+          + `${cap ? `（上限 ${n(cap)}，${s.today.tokens >= cap || s.paused === 'budget' ? '已到上限，明天接着抽' : `还剩 ${n(cap - s.today.tokens)}`}）` : ''}`,
       };
     }
   } catch { /* not memv2-lite */ }

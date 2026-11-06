@@ -693,7 +693,8 @@ async function status() {
       ...out, state: 'ok',
       detail: `图谱里 ${counts.done} 段，处理中 ${counts.sent} 段，排队 ${counts.pending} 段`
         + `${counts.failed ? `，失败 ${counts.failed} 段` : ''}；今天约用 ${spent.tokens.toLocaleString('en-US')} token`
-        + `${Number.isFinite(cap) && cap > 0 ? `（上限 ${cap.toLocaleString('en-US')}${spent.tokens >= cap ? '，已到上限，明天接着送' : ''}）` : ''}`,
+        + `${Number.isFinite(cap) && cap > 0 ? `（上限 ${cap.toLocaleString('en-US')}，${spent.tokens >= cap ? '已到上限，明天接着送'
+          : `还剩 ${(cap - spent.tokens).toLocaleString('en-US')}`}）` : ''}`,
     };
   }
   try {

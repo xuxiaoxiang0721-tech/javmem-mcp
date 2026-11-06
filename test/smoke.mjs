@@ -329,7 +329,7 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   assert.ok(bodies.every((x) => x.reference_time && !x.uuid && / · javmem [0-9a-f-]{13}$/.test(x.name)));
   s.close();
 
-  const env = { JAVIS_BACKEND: 'graphiti', JAVIS_URL: fake.url, JAVMEM_LOCAL_DB: db, GRAPHITI_GROUP_ID: 'bot-a', MEMORY_OWNER: '小明' };
+  const env = { JAVIS_BACKEND: 'graphiti', JAVIS_URL: fake.url, JAVMEM_LOCAL_DB: db, GRAPHITI_GROUP_ID: 'bot-a', MEMORY_OWNER: '小明', GRAPHITI_DAILY_TOKENS: '100000' };
   const call = (name, args) => ({ method: 'tools/call', params: { name, arguments: args } });
   const a = await session('javis-mcp.js', env, [{},
     call('search_memory', { query: '小雨 游泳课 周教练' }), call('find_sessions', { query: '深圳' }),
@@ -343,7 +343,7 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   assert.match(t(3), /#1 \[2026-09-14\] user：小雨的游泳课改到每周三下午了[\s\S]*下一页用 offset=2/);
   const st = a.get(4).result.stores[0];
   assert.deepEqual([st.state, st.backend, st.group], ['ok', 'graphiti', 'bot-a']);
-  assert.match(st.detail, /^图谱里 3 段，处理中 0 段，排队 0 段；今天约用 [\d,]+ token$/);
+  assert.match(st.detail, /^图谱里 3 段，处理中 0 段，排队 0 段；今天约用 [\d,]+ token（上限 100,000，(还剩 [\d,]+|已到上限，明天接着送)）$/);
   assert.match(t(5), /先用 search_memory 查一次/);
   // An entity id from a search, then its relations, in one process (as a Bot would ask).
   const uuid = t(1).match(/实体号：([0-9a-f-]{36})/)[1];
@@ -408,9 +408,15 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   await worker.run();
   assert.equal(worker.paused, 'budget', 'the day budget stops extraction');
   assert.equal(llm.state.chats, 2);
-  cfg.dailyTokens = 1000000;
+  // A restart keeps the day's count (it lives in the store), so it stays stopped; the next day it goes on.
+  const again2 = new lite.Store(cfg.db);
+  const restarted = new lite.Worker(again2, cfg);
+  await restarted.run();
+  assert.deepEqual([restarted.paused, llm.state.chats], ['budget', 2], 'a restart does not reset the budget');
+  again2.close();
+  cfg.now = () => Date.now() + 86400000;
   await worker.run();
-  assert.equal(worker.paused, null);
+  assert.equal(worker.paused, null, 'the next day it goes on where it stopped');
   assert.equal(llm.state.chats, 3, 'three stretches of talk; the inherited package needs no model');
   assert.ok(llm.state.models.every((m) => m === 'cheap-model'), 'short stretches go to the cheaper model');
   const w = ms.all('SELECT tier, kept, dropped FROM windows ORDER BY id');
@@ -432,7 +438,7 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   assert.match(t(3), /周教练/);
   assert.match(t(4), /"record_key": "sess-1:3"/);
   assert.equal(a.get(5).result.stores[0].state, 'ok');
-  assert.equal(a.get(5).result.stores[0].detail, '记录 9 条，事实 7 条（另有 1 条已被取代），排队 0 段；今天抽取用了 3,300 token（上限 1,000,000）');
+  assert.equal(a.get(5).result.stores[0].detail, '记录 9 条，事实 7 条（另有 1 条已被取代），排队 0 段；今天抽取用了 1,100 token（上限 2,200，还剩 1,100）');
   assert.match(t(6), /^\[2026-09-14\] [^\n]*\n\[2026-10-02\] /, 'entity search: what holds now, in time order');
   const b = await session('memv2-mcp.js', { ...env, MEMV2_TOKEN_FILE: tokB }, [{}, call('search', { query: '游泳课' })]);
   assert.match(text(b.get(1).result), /namespace_forbidden/);
@@ -456,7 +462,7 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   server.close();
   ms.close();
   await llm.close();
-  ok('memv2-lite: feed once, quotes checked, budget, cheap tier, superseded, inherited without a model, per-Bot tokens; with the graph (backend A) the combined server answers from both');
+  ok('memv2-lite: feed once, quotes checked, budget (kept over a restart, on again the next day), cheap tier, superseded, inherited without a model, per-Bot tokens; with the graph (backend A) the combined server answers from both');
 }
 
 // The install wizard and the estimate (items 13 and 17): the four choices with what they cost, the quote before

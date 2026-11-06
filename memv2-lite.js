@@ -442,6 +442,11 @@ class Worker {
     this.paused = null;
   }
 
+  /** Today in local time (cfg.now replaces the clock in tests): the budget starts again at midnight. */
+  today() {
+    return localDay(this.cfg.now ? this.cfg.now() : Date.now());
+  }
+
   next() {
     return this.store.get(`SELECT w.*, (SELECT title FROM records WHERE session = w.session LIMIT 1) AS title FROM windows w
       WHERE w.state = 'pending' AND w.next_at <= ? ORDER BY w.first_time, w.id LIMIT 1`, Date.now());
@@ -454,7 +459,7 @@ class Worker {
     let n = 0;
     try {
       while (n < max) {
-        if (this.cfg.dailyTokens && this.store.spend().tokens >= this.cfg.dailyTokens) { this.paused = 'budget'; break; }
+        if (this.cfg.dailyTokens && this.store.spend(this.today()).tokens >= this.cfg.dailyTokens) { this.paused = 'budget'; break; }
         this.paused = null;
         const w = this.next();
         if (!w) break;
@@ -495,7 +500,7 @@ class Worker {
           { role: 'user', content: promptOf(w, records, old) },
         ]);
         tokens = r.tokens;
-        store.addSpend(tokens);
+        store.addSpend(tokens, this.today());
         if (!r.out) throw Object.assign(new Error('the model answered without JSON'), { retry: true });
         ({ kept, dropped } = validate(r.out, records, old));
       }
@@ -660,7 +665,9 @@ function createServer(store, cfg, worker) {
       }
       if (req.method === 'GET' && url.pathname === '/api/v1/status') {
         const c = store.counts();
-        send(200, { ...c, today: { ...store.spend(), limit: cfg.dailyTokens }, paused: worker ? worker.paused : null,
+        const today = store.spend(localDay(cfg.now ? cfg.now() : Date.now()));
+        const left = cfg.dailyTokens ? Math.max(0, cfg.dailyTokens - today.tokens) : null;
+        send(200, { ...c, today: { ...today, limit: cfg.dailyTokens, left }, paused: worker ? worker.paused : null,
           models: { extract: cfg.model, cheap: cfg.cheapModel || null, embed: cfg.embedModel || null }, version: VERSION });
         return;
       }
