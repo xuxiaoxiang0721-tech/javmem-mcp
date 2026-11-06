@@ -19,8 +19,8 @@
 //   JAVIS_URL         default http://127.0.0.1:8765/mcp
 //   JAVIS_HIDE_FILE   the hide list (JSON: {facts, entities, sessions, messages}), default hidden.json next to this
 //                     file (missing = nothing hidden)
-//   JAVIS_VERIFY_FILE verdict lines ({"id","h":sha256(fact)[:16],"v":"pass|fail|unsure","mode":"single"}), default
-//                     verify/verdicts.jsonl next to this file (missing = every fact gets the rule check)
+//   JAVIS_VERIFY_FILE verdict lines ({"id","h":hex sha256(fact)[:16],"v":"pass|fail|unsure"}; the last line per fact
+//                     counts), default verify/verdicts.jsonl next to this file (missing = every fact gets the rule check)
 //   JAVIS_AUDIENCE    cc = the reader is a Bot's Claude Code; unset = the Bot's chat front
 //   MEMORY_OWNER      whose memory it is, as the tools should name them (default 用户)
 //   MEMORY_SOURCE     what the original records are (default 以前和 AI 的对话)
