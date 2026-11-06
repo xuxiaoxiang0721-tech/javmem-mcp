@@ -1,4 +1,4 @@
-# two-memory-mcp
+# javmem-mcp
 
 两个只读的 MCP 服务，给聊天 Bot（以及 Claude Code）查记忆用：
 
@@ -99,7 +99,7 @@
     "memory": {
       "type": "stdio",
       "command": "node",
-      "args": ["/path/to/two-memory-mcp/memory-mcp.js"],
+      "args": ["/path/to/javmem-mcp/memory-mcp.js"],
       "env": {
         "MEMV2_TOKEN_FILE": "/path/to/tokens/bot_a.token",
         "JAVIS_TOKEN_FILE": "/path/to/profiles/bot_a.env",
@@ -119,13 +119,13 @@
     "memv2": {
       "type": "stdio",
       "command": "node",
-      "args": ["/path/to/two-memory-mcp/memv2-mcp.js"],
+      "args": ["/path/to/javmem-mcp/memv2-mcp.js"],
       "env": { "MEMV2_TOKEN_FILE": "/path/to/tokens/bot_a.token", "MEMV2_AUDIENCE": "cc" }
     },
     "javis": {
       "type": "stdio",
       "command": "node",
-      "args": ["/path/to/two-memory-mcp/javis-mcp.js"],
+      "args": ["/path/to/javmem-mcp/javis-mcp.js"],
       "env": { "JAVIS_TOKEN_FILE": "/path/to/profiles/bot_a.env", "JAVIS_AUDIENCE": "cc" }
     }
   }

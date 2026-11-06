@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const scratch = mkdtempSync(join(tmpdir(), 'two-memory-mcp-'));
+const scratch = mkdtempSync(join(tmpdir(), 'javmem-mcp-'));
 const CLOSED = 'http://127.0.0.1:9'; // discard port: nothing listens
 
 /** Start a wrapper, send the requests in order, return the responses by id. */
