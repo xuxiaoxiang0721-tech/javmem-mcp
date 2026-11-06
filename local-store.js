@@ -2,7 +2,10 @@
 // was inherited from other tools (javmem-inherit), with a full-text index. Chinese, Japanese and Korean text is
 // indexed as pairs of neighbouring characters (游泳课 -> 游泳 泳课), so two-character words are found inside a sentence;
 // other text by words. Needs node:sqlite (Node 22.5 or later) with FTS5, which Node ships.
-// Writers (the DSH plugin's indexer, javmem-inherit) open it read-write; local-mcp.js opens it read-only.
+// Writers (the DSH plugin's indexer, javmem-inherit, javmem-feed) open it read-write; local-mcp.js and javis-mcp.js
+// (with JAVIS_BACKEND=graphiti) open it read-only. The episodes table records which stretches of which conversation
+// went to a store that extracts facts (feed.js), under that store's own id, and episode_nodes which entities it
+// found in each; spend counts the tokens used per day.
 'use strict';
 
 const fs = require('fs');
@@ -29,6 +32,18 @@ CREATE TABLE IF NOT EXISTS messages (
   text TEXT NOT NULL, origin TEXT NOT NULL, UNIQUE (session, seq));
 CREATE INDEX IF NOT EXISTS messages_time ON messages (time);
 CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(grams, content='', tokenize='unicode61');
+CREATE TABLE IF NOT EXISTS episodes (
+  uuid TEXT PRIMARY KEY, backend TEXT NOT NULL, grp TEXT NOT NULL DEFAULT '', session TEXT NOT NULL,
+  seq_from INTEGER NOT NULL, seq_to INTEGER NOT NULL, count INTEGER NOT NULL, chars INTEGER NOT NULL, first_time TEXT,
+  name TEXT, source TEXT NOT NULL DEFAULT 'message', body TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending',
+  tries INTEGER NOT NULL DEFAULT 0, sent_at TEXT, done_at TEXT, tier TEXT, tokens INTEGER, guid TEXT);
+CREATE INDEX IF NOT EXISTS episodes_state ON episodes (backend, grp, state);
+CREATE INDEX IF NOT EXISTS episodes_guid ON episodes (guid);
+CREATE INDEX IF NOT EXISTS episodes_cover ON episodes (backend, grp, session, seq_from);
+CREATE TABLE IF NOT EXISTS episode_nodes (node TEXT NOT NULL, episode TEXT NOT NULL, name TEXT, PRIMARY KEY (node, episode));
+CREATE TABLE IF NOT EXISTS spend (
+  day TEXT NOT NULL, backend TEXT NOT NULL, tokens INTEGER NOT NULL DEFAULT 0, segments INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, backend));
 `;
 
 // Scripts written without spaces between words.
@@ -184,6 +199,99 @@ class LocalStore {
     if (!m) return null;
     const before = this.db.prepare('SELECT COUNT(*) AS n FROM messages WHERE session = ? AND seq < ?').get(m.session, m.seq).n;
     return { session: m.session, index: before };
+  }
+
+  hasTable(name) {
+    return !!this.db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
+  }
+
+  // ---- Episodes: stretches of conversations sent to a store that extracts facts (feed.js) ----
+
+  /**
+   * Where the given episodes came from, by the id their store gave them (guid) or javmem's own:
+   * [{ uuid (the id asked for), session, seq_from, seq_to, body, first_time, title, origin, note }].
+   */
+  episodeSessions(uuids) {
+    if (!uuids.length || !this.hasTable('episodes')) return [];
+    const q = this.db.prepare(`SELECT e.session, e.seq_from, e.seq_to, e.body, e.first_time, s.title, s.origin, s.note
+      FROM episodes e JOIN sessions s ON s.id = e.session WHERE e.guid = ? OR e.uuid = ? LIMIT 1`);
+    return uuids.map((u) => {
+      const r = q.get(String(u), String(u));
+      return r ? { uuid: String(u), ...r } : null;
+    }).filter(Boolean);
+  }
+
+  /** Episodes as their store got them: [{ uuid, content, valid_at }]. */
+  episodeTexts(uuids) {
+    return this.episodeSessions(uuids).map((e) => ({ uuid: e.uuid, content: e.body, valid_at: e.first_time || null }));
+  }
+
+  /** Messages that no episode of this store (backend and group) covers yet, by session and order. */
+  unfed(backend, grp = '', limit = 5000) {
+    return this.rows(`SELECT m.*, s.title, s.note FROM messages m JOIN sessions s ON s.id = m.session
+      WHERE NOT EXISTS (SELECT 1 FROM episodes e WHERE e.backend = ? AND e.grp = ? AND e.session = m.session
+        AND m.seq BETWEEN e.seq_from AND e.seq_to)
+      ORDER BY m.session, m.seq LIMIT ?`, backend, grp, limit);
+  }
+
+  addEpisode(e) {
+    return this.db.prepare(`INSERT OR IGNORE INTO episodes (uuid, backend, grp, session, seq_from, seq_to, count, chars,
+      first_time, name, source, body, state, tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`)
+      .run(e.uuid, e.backend, e.grp || '', e.session, e.seq_from, e.seq_to, e.count, e.chars, e.first_time || null,
+        e.name || null, e.source || 'message', e.body, e.tier || null).changes;
+  }
+
+  episodesIn(backend, grp, state, limit = 100) {
+    return this.rows(`SELECT * FROM episodes WHERE backend = ? AND grp = ? AND state = ?
+      ORDER BY first_time, session, seq_from LIMIT ?`, backend, grp || '', state, limit);
+  }
+
+  setEpisode(uuid, fields) {
+    const keys = Object.keys(fields).filter((k) => ['state', 'tries', 'sent_at', 'done_at', 'tier', 'tokens', 'guid'].includes(k));
+    if (!keys.length) return;
+    this.db.prepare(`UPDATE episodes SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE uuid = ?`)
+      .run(...keys.map((k) => fields[k]), uuid);
+  }
+
+  /** Records which entities (people, things) the store found in an episode: [{ uuid, name }]. */
+  addEpisodeNodes(episode, nodes) {
+    const q = this.db.prepare('INSERT OR IGNORE INTO episode_nodes (node, episode, name) VALUES (?, ?, ?)');
+    for (const n of nodes) if (n && n.uuid) q.run(String(n.uuid), String(episode), n.name == null ? null : String(n.name));
+  }
+
+  /** The episodes an entity was found in, newest first. */
+  nodeEpisodes(node, limit = 10) {
+    if (!this.hasTable('episode_nodes')) return [];
+    return this.rows(`SELECT n.episode FROM episode_nodes n LEFT JOIN episodes e ON e.uuid = n.episode WHERE n.node = ?
+      ORDER BY e.first_time DESC LIMIT ?`, String(node), limit).map((r) => r.episode);
+  }
+
+  /** How many episodes of one store and group its store has finished (to size a listing of them). */
+  doneCount(backend, grp = '') {
+    return this.episodeCounts(backend, grp).done;
+  }
+
+  /** { pending, sent, done, failed } for one store and group. */
+  episodeCounts(backend, grp = '') {
+    const out = { pending: 0, sent: 0, done: 0, failed: 0 };
+    if (!this.hasTable('episodes')) return out;
+    for (const r of this.rows('SELECT state, COUNT(*) AS n FROM episodes WHERE backend = ? AND grp = ? GROUP BY state', backend, grp || '')) {
+      out[r.state] = r.n;
+    }
+    return out;
+  }
+
+  /** Tokens and segments spent on one day (YYYY-MM-DD, local time) for one store. */
+  spend(day, backend) {
+    if (!this.hasTable('spend')) return { tokens: 0, segments: 0 };
+    return this.db.prepare('SELECT tokens, segments FROM spend WHERE day = ? AND backend = ?').get(day, backend)
+      || { tokens: 0, segments: 0 };
+  }
+
+  addSpend(day, backend, tokens, segments = 0) {
+    this.db.prepare(`INSERT INTO spend (day, backend, tokens, segments) VALUES (?, ?, ?, ?)
+      ON CONFLICT(day, backend) DO UPDATE SET tokens = tokens + excluded.tokens, segments = segments + excluded.segments`)
+      .run(day, backend, Math.max(0, Math.round(tokens)), segments);
   }
 
   stats() {

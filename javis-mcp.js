@@ -18,6 +18,10 @@
 //   JAVIS_SOURCES     overrides the profile's accounts, comma separated; * = all
 //   JAVIS_URL         default http://127.0.0.1:8765/mcp; demo = the made-up demo data in demo/ (nothing to install, no
 //                     token; JAVIS_TOKEN_FILE may still name a profile, for its JAVIS_SOURCES)
+//   JAVIS_BACKEND     graphiti = the official Graphiti MCP server instead of Javis (graphiti.js; JAVIS_URL default
+//                     http://127.0.0.1:8000/mcp/, no token unless JAVIS_TOKEN_FILE names one for a proxy in front).
+//                     The original words then come from javmem's local store (JAVMEM_LOCAL_DB), which javmem-feed
+//                     sends into Graphiti; GRAPHITI_GROUP_ID is this Bot's group (default main)
 //   JAVIS_HIDE_FILE   the hide list (JSON: {facts, entities, sessions, messages}), default hidden.json next to this
 //                     file (missing = nothing hidden)
 //   JAVIS_VERIFY_FILE verdict lines ({"id","h":hex sha256(fact)[:16],"v":"pass|fail|unsure"}; the last line per fact
@@ -37,7 +41,11 @@ const path = require('path');
 const readline = require('readline');
 
 const DEMO = process.env.JAVIS_URL === 'demo';
-const ENDPOINT = new URL(DEMO ? 'http://demo.invalid/mcp' : (process.env.JAVIS_URL || 'http://127.0.0.1:8765/mcp'));
+const GRAPHITI = !DEMO && String(process.env.JAVIS_BACKEND || '').trim().toLowerCase() === 'graphiti';
+const ENDPOINT = new URL(DEMO ? 'http://demo.invalid/mcp'
+  : (process.env.JAVIS_URL || (GRAPHITI ? 'http://127.0.0.1:8000/mcp/' : 'http://127.0.0.1:8765/mcp')));
+const GROUP = process.env.GRAPHITI_GROUP_ID || 'main';
+const LOCAL_DB = process.env.JAVMEM_LOCAL_DB || '';
 const TOKEN_FILE = process.env.JAVIS_TOKEN_FILE || '';
 const HIDE_FILE = process.env.JAVIS_HIDE_FILE || path.join(__dirname, 'hidden.json');
 const VERIFY_FILE = process.env.JAVIS_VERIFY_FILE
@@ -135,7 +143,10 @@ const TOOLS = [
   },
 ];
 
-class UserError extends Error {}
+class UserError extends Error {
+  // graphiti.js passes these messages on as they are.
+  get user() { return true; }
+}
 
 function lineValue(text, key) {
   const line = text.split(/\r?\n/).find((l) => new RegExp(`^\\s*(export\\s+)?${key}\\s*=`).test(l));
@@ -152,7 +163,7 @@ function readText(file) {
 
 // The Bot profile (or Javis's .env.mcp): which accounts this Bot may see, and where the token is.
 function profile() {
-  if (!TOKEN_FILE && !DEMO) throw new UserError('没有配置 JAVIS_TOKEN_FILE（这个 Bot 的 Javis 设置，或 Javis 的 .env.mcp）。');
+  if (!TOKEN_FILE && !DEMO && !GRAPHITI) throw new UserError('没有配置 JAVIS_TOKEN_FILE（这个 Bot 的 Javis 设置，或 Javis 的 .env.mcp）。');
   const text = TOKEN_FILE ? readText(TOKEN_FILE) : '';
   const from = lineValue(text, 'JAVIS_TOKEN_FROM');
   const listed = process.env.JAVIS_SOURCES != null && process.env.JAVIS_SOURCES.trim() !== ''
@@ -185,11 +196,34 @@ function parseBody(raw, contentType) {
 
 let nextId = 1;
 
+// With JAVIS_BACKEND=graphiti: the local store (read-only) holding the original words, and the Graphiti backend.
+let store = null;
+function localStore() {
+  if (store) return store;
+  if (!LOCAL_DB) throw new UserError('没有配置 JAVMEM_LOCAL_DB：接 Graphiti 时，原话放在 javmem 的本地库里。');
+  if (!fs.existsSync(LOCAL_DB)) throw new UserError('本地库还没建好：先用 DSH 插件或 javmem-inherit、javmem-feed 把对话放进去。');
+  const { LocalStore } = require('./local-store.js');
+  store = new LocalStore(LOCAL_DB, { readonly: true });
+  return store;
+}
+
+let graph = null;
+function graphBackend() {
+  if (!graph) {
+    graph = require('./graphiti.js').createBackend({
+      url: ENDPOINT.href, group: GROUP, version: VERSION, openStore: localStore,
+      token: TOKEN_FILE ? () => readToken(profile()) : null,
+    });
+  }
+  return graph;
+}
+
 const javis = (name, args, timeoutMs) => rpc('tools/call', { name, arguments: args }, timeoutMs);
 
 // One JSON-RPC request to Javis's MCP endpoint, with this Bot's token. HTTP refusals carry their status.
 function rpc(method, params, timeoutMs) {
   if (DEMO) return Promise.resolve().then(() => require('./demo.js').javis(method, params));
+  if (GRAPHITI) return Promise.resolve().then(() => graphBackend().answer(method, params, timeoutMs));
   return new Promise((resolve, reject) => {
     const body = Buffer.from(JSON.stringify({ jsonrpc: '2.0', id: nextId++, method, params }), 'utf8');
     const req = http.request({
@@ -635,6 +669,27 @@ async function status() {
   } catch {
     out.hide_list = 'unreadable';
   }
+  if (GRAPHITI) {
+    // The official Graphiti server: is it up, can it reach its database, and how far the feeder has got.
+    Object.assign(out, { backend: 'graphiti', group: GROUP });
+    let counts;
+    try {
+      counts = localStore().episodeCounts('graphiti', GROUP);
+    } catch (err) {
+      return { ...out, state: 'error', detail: err.message };
+    }
+    try {
+      const s = await graphBackend().status(5000);
+      if (!s.ok) return { ...out, state: 'error', detail: `图谱服务连不上它的数据库：${s.message}` };
+    } catch (err) {
+      return { ...out, state: err.status ? 'error' : 'down', detail: err.message };
+    }
+    return {
+      ...out, state: 'ok',
+      detail: `图谱里 ${counts.done} 段，处理中 ${counts.sent} 段，排队 ${counts.pending} 段`
+        + `${counts.failed ? `，失败 ${counts.failed} 段` : ''}`,
+    };
+  }
   try {
     readToken(profile());
   } catch (err) {
@@ -736,7 +791,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  VERSION, DEMO, GUIDE, RAW_NOTE, MAX_TEXT, HIDDEN_LINE, UserError, FOR_CC, OWNER, FIX_HOW,
+  VERSION, DEMO, GRAPHITI, GUIDE, RAW_NOTE, MAX_TEXT, HIDDEN_LINE, UserError, FOR_CC, OWNER, FIX_HOW,
   clip, day, when, session, matchSession, fit, droppedNote, factLine, relationLine, intIn,
   searchFacts, entityFacts, findMatches, searchMemory, getEntity, findSessions, getConversation, status,
 };

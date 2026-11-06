@@ -277,6 +277,88 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   ok('javmem-inherit: prompt, check, import once, shown as inherited, junk refused');
 }
 
+// The official Graphiti server as the graph store (a stand-in here): javmem-feed cuts settled conversations into
+// episodes, sends each once within the window and the day's budget, confirms them, sends again what the server lost;
+// javis-mcp.js with JAVIS_BACKEND=graphiti answers its four tools from Graphiti plus the local store, and the
+// combined server works on top of it.
+{
+  const { createRequire } = await import('node:module');
+  const req = createRequire(import.meta.url);
+  const { LocalStore } = req('../local-store.js');
+  const { importPackage } = req('../inherit.js');
+  const { feedGraphiti, segments } = req('../feed.js');
+  const { startFakeGraphiti } = await import('./fake-graphiti.mjs');
+  const fake = await startFakeGraphiti();
+  const db = join(scratch, 'graph.sqlite');
+  const s = new LocalStore(db);
+  s.add({ id: 'sess-1', title: '游泳课', origin: 'session' }, [
+    { seq: 3, role: 'user', time: '2026-09-14T19:02:00+08:00', text: '小雨的游泳课改到每周三下午了，教练是周教练。' },
+    { seq: 5, role: 'assistant', time: '2026-09-14T19:03:00+08:00', text: '记下了，小雨每周三下午跟周教练上游泳课。' },
+    { seq: 9, role: 'user', time: '2026-10-25T18:20:00+08:00', text: '老陈说他 12 月调去深圳分公司了。' },
+  ], 12);
+  importPackage(s, readFileSync(join(root, 'demo', 'inherit-grok.json'), 'utf8'));
+  const day = Date.parse('2026-11-06T12:00:00+08:00');
+  // A live conversation's last message waits for more; once quiet it goes, split at the six-week pause.
+  const fresh = segments(s.unfed('graphiti', 'bot-a'), { now: Date.parse('2026-10-25T18:30:00+08:00') });
+  assert.deepEqual(fresh.map((g) => g.length), [5, 2], 'the inherited package first (older), the open end waits');
+  const opts = { url: fake.url, group: 'bot-a', owner: '小明', assistant: '小助手', now: day };
+  fake.state.paused = true;
+  let r = await feedGraphiti(s, { ...opts, window: 2 });
+  assert.deepEqual([r.added, r.sent, r.counts.pending, r.counts.sent], [3, 2, 1, 2]);
+  assert.equal(r.today.segments, 2);
+  fake.state.lose(); // the server restarts and forgets its queue
+  r = await feedGraphiti(s, { ...opts, window: 2, now: day + 60000 });
+  assert.deepEqual([r.confirmed, r.resent, r.sent], [0, 0, 0], 'still waiting');
+  r = await feedGraphiti(s, { ...opts, window: 2, now: day + 31 * 60000 });
+  assert.equal(r.resent, 2, 'nothing finished for half an hour: sent again');
+  assert.equal(r.sent, 2);
+  fake.state.paused = false;
+  fake.state.drain();
+  r = await feedGraphiti(s, { ...opts, window: 2, now: day + 32 * 60000, dailyTokens: 20000 * 4 });
+  assert.equal(r.confirmed, 2);
+  assert.equal(r.stopped, 'budget', 'the day budget stops the rest');
+  assert.equal(r.counts.pending, 1);
+  r = await feedGraphiti(s, { ...opts, window: 2, now: day + 24 * 3600000, dailyTokens: 20000 * 4 });
+  assert.deepEqual([r.sent, r.counts.done], [1, 2], 'the next day it goes on where it stopped');
+  r = await feedGraphiti(s, { ...opts, now: day + 24 * 3600000 + 60000 });
+  assert.deepEqual(r.counts, { pending: 0, sent: 0, done: 3, failed: 0 });
+  assert.equal(new Set([...fake.state.episodes.values()].map((e) => e.group)).size, 1);
+  const bodies = [...fake.state.episodes.values()].map((e) => e.args);
+  assert.ok(bodies.some((x) => x.source === 'message' && /^小明: 小雨的游泳课/.test(x.episode_body) && /\n小助手: 记下了/.test(x.episode_body)));
+  assert.ok(bodies.some((x) => x.source === 'text' && /^继承自 Grok的记忆（2026-10-30 导出），关于小明：/.test(x.episode_body)));
+  assert.ok(bodies.every((x) => x.reference_time && !x.uuid && / · javmem [0-9a-f-]{13}$/.test(x.name)));
+  s.close();
+
+  const env = { JAVIS_BACKEND: 'graphiti', JAVIS_URL: fake.url, JAVMEM_LOCAL_DB: db, GRAPHITI_GROUP_ID: 'bot-a', MEMORY_OWNER: '小明' };
+  const call = (name, args) => ({ method: 'tools/call', params: { name, arguments: args } });
+  const a = await session('javis-mcp.js', env, [{},
+    call('search_memory', { query: '小雨 游泳课 周教练' }), call('find_sessions', { query: '深圳' }),
+    call('get_conversation', { session_id: 'sess-1', limit: 2 }), { method: 'javmem/status', params: {} },
+    call('get_entity', { entity_uuid: 'not-shown-before' })]);
+  const t = (n) => text(a.get(n).result);
+  assert.match(t(1), /^下面是 Javis 从小明以前和 AI 的对话里自动抽出来的事实/);
+  assert.match(t(1), /小雨的游泳课改到每周三下午了，教练是周教练。（2026-09-14 起）（未细核）/);
+  assert.match(t(1), /来源：《游泳课》（对话，对话号 sess-1）/);
+  assert.match(t(2), /\[2026-10-25\] 《游泳课》（对话，对话号 sess-1） user：老陈说他 12 月调去深圳分公司了。/);
+  assert.match(t(3), /#1 \[2026-09-14\] user：小雨的游泳课改到每周三下午了[\s\S]*下一页用 offset=2/);
+  const st = a.get(4).result.stores[0];
+  assert.deepEqual([st.state, st.backend, st.group], ['ok', 'graphiti', 'bot-a']);
+  assert.match(st.detail, /^图谱里 3 段，处理中 0 段，排队 0 段$/);
+  assert.match(t(5), /先用 search_memory 查一次/);
+  // An entity id from a search, then its relations, in one process (as a Bot would ask).
+  const uuid = t(1).match(/实体号：([0-9a-f-]{36})/)[1];
+  const b = await session('javis-mcp.js', env, [{}, call('search_memory', { query: '游泳课' }), call('get_entity', { entity_uuid: uuid })]);
+  assert.match(text(b.get(2).result), /（测试摘要）\n关系（含已失效的）：\n1\. /);
+  const c = await session('memory-mcp.js', { ...env, MEMV2_URL: 'demo' }, [{}, call('search', { query: '游泳课' })]);
+  assert.match(text(c.get(1).result), /游泳课/);
+  assert.notEqual(c.get(1).result.isError, true);
+  const down = await session('javis-mcp.js', { ...env, JAVIS_URL: `${CLOSED}/mcp/` }, [{}, { method: 'javmem/status', params: {} }]);
+  assert.equal(down.get(1).result.stores[0].state, 'down');
+  assert.ok(fake.state.calls.every((n) => ['tools/list', 'add_memory', 'get_episodes', 'search_memory_facts', 'get_episode_entities', 'get_status'].includes(n)));
+  await fake.close();
+  ok('Graphiti backend: feeder (settle, window, lost, budget, next day), four tools, status, combined server');
+}
+
 // scripts/eval.mjs on the demo questions: the counts it prints, and nothing but counts.
 {
   const { spawnSync } = await import('node:child_process');

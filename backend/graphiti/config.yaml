@@ -1,0 +1,63 @@
+# The official Graphiti MCP server's settings as javmem uses them (mounted over the image's own file).
+# Every model setting comes from .env, so one file serves OpenAI, DeepSeek or Qwen in the cloud, and Ollama at home.
+# ${NAME:default} is the server's own syntax.
+
+server:
+  transport: "http"
+  host: "0.0.0.0"   # inside the container; docker-compose.yml publishes it on 127.0.0.1 only
+  port: 8000
+
+llm:
+  provider: "openai"   # any OpenAI-compatible service: OpenAI, DeepSeek, Qwen (DashScope), Ollama, LM Studio, vLLM
+  model: ${MODEL_NAME:gpt-6-luna}
+  max_tokens: ${LLM_MAX_TOKENS:4096}
+  # json_schema for OpenAI; json_object for services that accept a schema but do not keep to it (many local models)
+  structured_output_mode: ${LLM_STRUCTURED_OUTPUT_MODE:json_schema}
+  providers:
+    openai:
+      api_key: ${OPENAI_API_KEY}
+      api_url: ${OPENAI_API_URL:https://api.openai.com/v1}
+
+embedder:
+  provider: "openai"
+  model: ${EMBEDDER_MODEL:text-embedding-3-small}
+  dimensions: ${EMBEDDER_DIM:1536}
+  providers:
+    openai:
+      api_key: ${EMBEDDER_API_KEY}
+      api_url: ${EMBEDDER_API_URL:https://api.openai.com/v1}
+
+database:
+  provider: "falkordb"
+  providers:
+    falkordb:
+      uri: ${FALKORDB_URI:redis://localhost:6379}
+      password: ${FALKORDB_PASSWORD:}
+      database: ${FALKORDB_DATABASE:javmem}
+
+graphiti:
+  group_id: ${GRAPHITI_GROUP_ID:main}
+  episode_id_prefix: ""
+  user_id: "javmem"
+  # The kinds of things Graphiti picks out of a conversation (the official list).
+  entity_types:
+    - name: "Preference"
+      description: "User preferences, choices, opinions, or selections (PRIORITIZE over most other types except User/Assistant)"
+    - name: "Requirement"
+      description: "Specific needs, features, or functionality that must be fulfilled"
+    - name: "Procedure"
+      description: "Standard operating procedures and sequential instructions"
+    - name: "Location"
+      description: "Physical or virtual places where activities occur"
+    - name: "Event"
+      description: "Time-bound activities, occurrences, or experiences"
+    - name: "Organization"
+      description: "Companies, institutions, groups, or formal entities"
+    - name: "Document"
+      description: "Information content in various forms (books, articles, reports, etc.)"
+    - name: "Topic"
+      description: "Subject of conversation, interest, or knowledge domain (use as last resort)"
+    - name: "Person"
+      description: "An individual human referenced in the content"
+    - name: "Object"
+      description: "Physical items, tools, devices, or possessions (use as last resort)"

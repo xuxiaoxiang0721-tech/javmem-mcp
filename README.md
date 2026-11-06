@@ -155,6 +155,15 @@ claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_T
 
 继承来的记忆没有和原始对话核对过，工具说明会提醒模型讲明出处。
 
+## 图谱接 Graphiti 官方服务（后端 C）
+
+Javis 那层没有公开，图谱可以换成 [Graphiti](https://github.com/getzep/graphiti) 官方的 MCP 服务（Zep 维护）：`backend/graphiti/` 里有一份菜谱（一个 Docker 容器，模型可选 OpenAI、DeepSeek 加千问、或本地 Ollama），见 [backend/graphiti/README.md](backend/graphiti/README.md)。
+
+- **送进去**：`javmem-feed` 把本地库里的对话一段一段（最多 8 条）送进 Graphiti，每段只送一次；对话停了 30 分钟或攒够 8 条才送；每天有 token 上限（默认每个库 100 万），到了就停，第二天接着送；Graphiti 丢了的（它的队列在内存里）半小时后重送。只打印条数。
+- **查出来**：`javis-mcp.js` 设 `JAVIS_BACKEND=graphiti`，四个工具照旧：事实和人从 Graphiti 来，原话从本地库来（官方服务不能按原话搜）。合起来的 `memory-mcp.js` 也能接。
+- 每个 Bot 一个组（`GRAPHITI_GROUP_ID`），互相看不到。只读：查的时候不改图谱。
+- 花多少：2026-11-06 自测（官方服务 1.1.3 + gpt-6-luna，虚构的 23 条消息切成 9 段）每段约 1.5 万 token；按每段 2 万估，约合每 1,000 条消息 250 万 token。本地 Ollama 不花钱但慢。
+
 ## 做了什么
 
 - **只读**：三个程序都只转发查询，不改 memv2 和 Javis 里的任何东西。
@@ -197,7 +206,7 @@ claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_T
 - **memv2 在运行**，程序要知道它的地址（默认 `http://127.0.0.1:8766`，即本机的 8766 端口）。每个 Bot 还要一个只读令牌，相当于这个 Bot 的借阅证：由 memv2 的管理员发，发的时候就定好它能查哪些分区（memv2 里叫命名空间）。令牌存在一个文件里，配置里只写这个文件的路径（`MEMV2_TOKEN_FILE`）。
 - **Javis 在运行**，程序要知道它的地址（默认 `http://127.0.0.1:8765/mcp`），还要 Javis 的令牌，同样存在文件里。每个 Bot 能看哪些账号，写在这个 Bot 的配置文件里（`JAVIS_TOKEN_FILE`，格式见下文）。
 
-**注意**：memv2 底下用的 SQLite、Javis 底下用的 Graphiti 和 Neo4j 都是公开的，可以自己装；但 memv2 和 Javis 这两层目前没有公开发布，而这些程序调用的正是它们自己的查询接口。所以光装 SQLite、Graphiti、Neo4j 还接不上，这些程序装上也查不到任何东西。
+**注意**：memv2 和 Javis 这两层目前没有公开发布，`memv2-mcp.js` 和 `javis-mcp.js` 默认调用的正是它们自己的查询接口。不搭它们也能用：本地库装上就有；图谱可以换成 Graphiti 官方服务（`JAVIS_BACKEND=graphiti`，见「图谱接 Graphiti 官方服务」）。
 
 ## 配置（环境变量）
 
@@ -218,7 +227,10 @@ claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_T
 |---|---|
 | `JAVIS_TOKEN_FILE` | 必填。Bot 的配置文件（每行 `KEY=value`：`JAVIS_SOURCES=<账号，逗号隔开，或 *>`、`JAVIS_TOKEN_FROM=<存 Javis 令牌的文件>`），或者直接给存令牌的文件（这时所有账号都能看） |
 | `JAVIS_SOURCES` | 覆盖配置文件里的账号；`*` = 全部 |
-| `JAVIS_URL` | 默认 `http://127.0.0.1:8765/mcp`；`demo` = 读包里的虚构演示数据 |
+| `JAVIS_URL` | 默认 `http://127.0.0.1:8765/mcp`（接 Graphiti 时默认 `http://127.0.0.1:8000/mcp/`）；`demo` = 读包里的虚构演示数据 |
+| `JAVIS_BACKEND` | `graphiti` = 接 Graphiti 官方服务（它不要令牌，`JAVIS_TOKEN_FILE` 可以不填） |
+| `GRAPHITI_GROUP_ID` | 接 Graphiti 时这个 Bot 的组，默认 `main` |
+| `JAVMEM_LOCAL_DB` | 接 Graphiti 时必填：本地库文件（原话在这里，`javmem-feed` 从这里送） |
 | `JAVIS_HIDE_FILE` | 隐藏名单，默认程序旁边的 `hidden.json`（没有 = 不隐藏） |
 | `JAVIS_VERIFY_FILE` | 判定文件，默认程序旁边的 `verify/verdicts.jsonl`（没有 = 每条事实都按规则查） |
 | `JAVIS_AUDIENCE` | 同上 |

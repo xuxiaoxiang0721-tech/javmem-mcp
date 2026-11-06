@@ -19,7 +19,8 @@
     "memv2-mcp": "memv2-mcp.js",
     "javis-mcp": "javis-mcp.js",
     "javmem-local": "local-mcp.js",
-    "javmem-inherit": "inherit.js"
+    "javmem-inherit": "inherit.js",
+    "javmem-feed": "feed.js"
   },
   "files": [
     "memory-mcp.js",
@@ -28,6 +29,9 @@
     "local-store.js",
     "local-mcp.js",
     "inherit.js",
+    "graphiti.js",
+    "feed.js",
+    "backend/",
     "demo.js",
     "demo/",
     "scripts/demo.mjs",

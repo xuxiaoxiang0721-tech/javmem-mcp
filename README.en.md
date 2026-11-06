@@ -155,6 +155,15 @@ What another AI tool (Grok, Muse, Dot, ChatGPT and the like) remembers about you
 
 Inherited memory was never checked against the original conversations, and the tool text tells the model to name where it came from.
 
+## The graph on the official Graphiti server (backend C)
+
+Javis is not public, so the graph can be the official [Graphiti](https://github.com/getzep/graphiti) MCP server (maintained by Zep) instead: `backend/graphiti/` has a recipe (one Docker container; models from OpenAI, DeepSeek with Qwen, or a local Ollama), see [backend/graphiti/README.md](backend/graphiti/README.md).
+
+- **In**: `javmem-feed` sends the local store's conversations to Graphiti in episodes of up to 8 messages, each once; a conversation goes when it has been quiet for 30 minutes or has 8 new messages; a daily token budget (default 1,000,000 per store) stops it until the next day; what Graphiti lost (its queue is in memory) is sent again after half an hour. It prints counts only.
+- **Out**: `javis-mcp.js` with `JAVIS_BACKEND=graphiti` keeps its four tools: facts and people from Graphiti, the original words from the local store (the official server cannot search them). The combined `memory-mcp.js` works on top of it.
+- One group per Bot (`GRAPHITI_GROUP_ID`), invisible to the others. Read-only: queries change nothing in the graph.
+- Cost: measured 2026-11-06 (official server 1.1.3 with gpt-6-luna, 23 made-up messages in 9 episodes) about 15,000 tokens per episode; counted as 20,000, roughly 2.5 million tokens per 1,000 messages. A local Ollama costs nothing but is slow.
+
 ## What they do
 
 - **Read-only**: all three only forward queries and change nothing in memv2 or Javis.
@@ -197,7 +206,7 @@ The servers store no memory; they only query the two memory stores for the Bots.
 - **memv2 running**, at an address they know (default `http://127.0.0.1:8766`, port 8766 on this machine). Every Bot needs a read-only token, its library card so to speak: memv2's administrator issues it and decides at that moment which partitions (namespaces, in memv2) it may read. The token lives in a file; the configuration only holds that file's path (`MEMV2_TOKEN_FILE`).
 - **Javis running**, at an address they know (default `http://127.0.0.1:8765/mcp`), and Javis's token, also in a file. The accounts each Bot may see are in that Bot's profile (`JAVIS_TOKEN_FILE`, format below).
 
-**Note**: the SQLite under memv2 and the Graphiti and Neo4j under Javis are public and can be installed; memv2 and Javis themselves are not publicly released at the moment, and these servers talk to their own query interfaces. So SQLite, Graphiti and Neo4j alone are not enough: the servers find nothing without memv2 and Javis.
+**Note**: memv2 and Javis themselves are not publicly released at the moment, and `memv2-mcp.js` and `javis-mcp.js` talk to their own query interfaces by default. Without them: the local store works as installed, and the graph can be the official Graphiti server (`JAVIS_BACKEND=graphiti`, see "The graph on the official Graphiti server").
 
 ## Configuration (environment variables)
 
@@ -218,7 +227,10 @@ The servers store no memory; they only query the two memory stores for the Bots.
 |---|---|
 | `JAVIS_TOKEN_FILE` | required. The Bot's profile (`KEY=value` lines: `JAVIS_SOURCES=<accounts, comma separated, or *>`, `JAVIS_TOKEN_FROM=<the file holding Javis's token>`), or that token file itself (then every account is shown) |
 | `JAVIS_SOURCES` | overrides the profile's accounts; `*` = all |
-| `JAVIS_URL` | default `http://127.0.0.1:8765/mcp`; `demo` = the made-up demo data in the package |
+| `JAVIS_URL` | default `http://127.0.0.1:8765/mcp` (with Graphiti `http://127.0.0.1:8000/mcp/`); `demo` = the made-up demo data in the package |
+| `JAVIS_BACKEND` | `graphiti` = the official Graphiti server (it needs no token, so `JAVIS_TOKEN_FILE` may stay unset) |
+| `GRAPHITI_GROUP_ID` | with Graphiti: this Bot's group, default `main` |
+| `JAVMEM_LOCAL_DB` | required with Graphiti: the local store (the original words live there; `javmem-feed` sends from it) |
 | `JAVIS_HIDE_FILE` | the hide list, default `hidden.json` next to the server (missing = nothing hidden) |
 | `JAVIS_VERIFY_FILE` | the verdict file, default `verify/verdicts.jsonl` next to the server (missing = every fact gets the rule check) |
 | `JAVIS_AUDIENCE` | as above |

@@ -11,6 +11,7 @@
 - 实测数字：`scripts/eval.mjs` 用同一批题比较合起来的工具和单库，只打印计数；README 写了作者记忆库上的结果（2/7 与单库相同，两库都记的事实 97.4% 说法一致）和演示数据上的结果。
 - 本地库（零准备）：`local-mcp.js` 和 `local-store.js`，读一个本机的 SQLite 文件，五个工具和合起来的那套同名；中文按相邻两字建全文索引；命令 `javmem-local`；要 Node 22.5 以上。
 - 继承别的 AI 的记忆：`inherit.js`（命令 `javmem-inherit`）给出导出提示词（中英文，也在 `docs/inherit-prompt.md`），检查和导入别的 AI 写出的 javmem 包，导进本地库时标上来源，同一个包不重复导入；附一个虚构的示例包 `demo/inherit-grok.json`。
+- 图谱可以接 Graphiti 官方服务（后端 C）：`javis-mcp.js` 设 `JAVIS_BACKEND=graphiti`，四个工具照旧（事实从 Graphiti 来，原话从本地库来，`graphiti.js`）；`feed.js`（命令 `javmem-feed`）把本地库里的对话按段送进 Graphiti，每段一次，有每天的 token 上限，丢了会重送；`backend/graphiti/` 是官方镜像的 compose 菜谱，模型可选 OpenAI、DeepSeek 加千问、本地 Ollama。用 gpt-6-luna 和本机向量模型实测过。
 
 English:
 
@@ -22,6 +23,7 @@ English:
 - Demo data: with `MEMV2_URL=demo` and `JAVIS_URL=demo` the servers answer from made-up data in the package (`demo.js`, `demo/`), all thirteen tools, no token; `node scripts/demo.mjs` asks each of the five once; the README has a picture (made by `scripts/screenshot.mjs`).
 - The local store (zero setup): `local-mcp.js` and `local-store.js` over one SQLite file on this machine, the same five tool names as the combined set; Chinese indexed as pairs of neighbouring characters; command `javmem-local`; Node 22.5 or later.
 - Memory inherited from other AIs: `inherit.js` (command `javmem-inherit`) gives the export prompt (Chinese and English, also in `docs/inherit-prompt.md`), checks and imports the javmem package another AI writes into a local store, marked with where it came from, each package once; a made-up example package is in `demo/inherit-grok.json`.
+- The graph on the official Graphiti server (backend C): `javis-mcp.js` with `JAVIS_BACKEND=graphiti` keeps its four tools (facts from Graphiti, the original words from the local store; `graphiti.js`); `feed.js` (command `javmem-feed`) sends the local store's conversations to Graphiti in episodes, each once, within a daily token budget, resending what Graphiti lost; `backend/graphiti/` is a compose recipe for the official image, with models from OpenAI, DeepSeek with Qwen, or a local Ollama. Tested with gpt-6-luna and a local embedding model.
 - Measured numbers: `scripts/eval.mjs` compares the combined server with each store alone on the same questions and prints counts only; the README has the results on the author's memory (2/7, the same as either store; 97.4% of facts both stores hold agree) and on the demo data.
 
 ## 0.2.0
