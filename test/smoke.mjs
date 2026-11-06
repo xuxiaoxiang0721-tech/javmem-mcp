@@ -111,4 +111,52 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   ok('memory: each store\'s own error is shown');
 }
 
+// javmem/status (not a tool): each store's state, from a closed port, a missing token, and a fake memv2 and Javis that
+// take one token and refuse another. The answer never carries a token.
+{
+  const http = await import('node:http');
+  const GOOD = 'tok-GOOD-1234';
+  const fake = http.createServer((req, res) => {
+    const ok = req.headers.authorization === `Bearer ${GOOD}`;
+    const reply = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
+    let body = '';
+    req.on('data', (c) => { body += c; });
+    req.on('end', () => {
+      if (req.method === 'GET' && req.url === '/api/v1/records/javmem-status-check') return ok ? reply(404, null) : reply(403, { error: 'invalid_client_token' });
+      if (req.method === 'POST' && req.url === '/mcp') {
+        if (!ok) return reply(401, { error: 'unauthorized' });
+        const m = JSON.parse(body);
+        return reply(200, m.method === 'tools/list' ? { jsonrpc: '2.0', id: m.id, result: { tools: [] } } : { jsonrpc: '2.0', id: m.id, error: { message: 'no' } });
+      }
+      return reply(404, { error: 'not_found' });
+    });
+  });
+  await new Promise((r) => fake.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${fake.address().port}`;
+  const good = join(scratch, 'good.token');
+  const bad = join(scratch, 'bad.token');
+  writeFileSync(good, `${GOOD}\n`);
+  writeFileSync(bad, 'tok-BAD-5678\n');
+  const goodProfile = join(scratch, 'good.env');
+  writeFileSync(goodProfile, `JAVIS_SOURCES=*\nJAVIS_TOKEN_FROM=${good}\n`);
+  const ask = async (script, env) => (await session(script, env, [{}, { method: 'javmem/status', params: {} }])).get(1).result;
+  const states = (r) => r.stores.map((s) => `${s.store}:${s.state}`);
+  try {
+    assert.deepEqual(states(await ask('memv2-mcp.js', { MEMV2_URL: url, MEMV2_TOKEN_FILE: good })), ['memv2:ok']);
+    assert.deepEqual(states(await ask('memv2-mcp.js', { MEMV2_URL: url, MEMV2_TOKEN_FILE: bad })), ['memv2:bad_token']);
+    assert.deepEqual(states(await ask('memv2-mcp.js', { MEMV2_URL: CLOSED, MEMV2_TOKEN_FILE: good })), ['memv2:down']);
+    assert.deepEqual(states(await ask('memv2-mcp.js', { MEMV2_URL: url, MEMV2_TOKEN_FILE: '' })), ['memv2:no_token']);
+    assert.deepEqual(states(await ask('javis-mcp.js', { JAVIS_URL: `${url}/mcp`, JAVIS_TOKEN_FILE: goodProfile })), ['javis:ok']);
+    assert.deepEqual(states(await ask('javis-mcp.js', { JAVIS_URL: `${url}/mcp`, JAVIS_TOKEN_FILE: bad })), ['javis:bad_token']);
+    const both = await ask('memory-mcp.js', { MEMV2_URL: url, MEMV2_TOKEN_FILE: good, JAVIS_URL: `${CLOSED}/mcp`, JAVIS_TOKEN_FILE: goodProfile });
+    assert.deepEqual(states(both), ['memv2:ok', 'javis:down']);
+    assert.equal(both.labels, 'none');
+    assert.equal(both.stores[1].hide_list, 'none');
+    assert.ok(!/tok-/.test(JSON.stringify(both)), 'a status answer never carries a token');
+  } finally {
+    fake.close();
+  }
+  ok('javmem/status: ok, bad token, down, no token, for each store; no token in the answer');
+}
+
 console.log(`${passed} checks passed`);

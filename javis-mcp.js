@@ -182,11 +182,12 @@ function parseBody(raw, contentType) {
 
 let nextId = 1;
 
-function javis(name, args, timeoutMs) {
+const javis = (name, args, timeoutMs) => rpc('tools/call', { name, arguments: args }, timeoutMs);
+
+// One JSON-RPC request to Javis's MCP endpoint, with this Bot's token. HTTP refusals carry their status.
+function rpc(method, params, timeoutMs) {
   return new Promise((resolve, reject) => {
-    const body = Buffer.from(JSON.stringify({
-      jsonrpc: '2.0', id: nextId++, method: 'tools/call', params: { name, arguments: args },
-    }), 'utf8');
+    const body = Buffer.from(JSON.stringify({ jsonrpc: '2.0', id: nextId++, method, params }), 'utf8');
     const req = http.request({
       agent, method: 'POST', timeout: timeoutMs,
       host: ENDPOINT.hostname, port: ENDPOINT.port || 80, path: ENDPOINT.pathname + ENDPOINT.search,
@@ -200,15 +201,20 @@ function javis(name, args, timeoutMs) {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
+        const refuse = (text) => {
+          const error = new UserError(text);
+          error.status = res.statusCode;
+          reject(error);
+        };
         if (res.statusCode === 401) {
-          reject(new UserError('令牌不对：Javis 不认这个令牌，可能 Javis 换了令牌。'));
+          refuse('令牌不对：Javis 不认这个令牌，可能 Javis 换了令牌。');
           return;
         }
         const msg = parseBody(Buffer.concat(chunks).toString('utf8'), res.headers['content-type']);
         if (!msg || typeof msg !== 'object') {
-          reject(new UserError(`Javis 返回了看不懂的结果（HTTP ${res.statusCode}）。`));
+          refuse(`Javis 返回了看不懂的结果（HTTP ${res.statusCode}）。`);
         } else if (msg.error) {
-          reject(new UserError(`Javis 报错：${msg.error.message || '原因不明'}`));
+          refuse(`Javis 报错：${msg.error.message || '原因不明'}`);
         } else {
           resolve(msg.result || {});
         }
@@ -613,6 +619,31 @@ async function getConversation(args) {
   return out.join('\n');
 }
 
+// For a host's status check (the javmem/status request, not a tool): can Javis be reached, does it take the token,
+// and can the hide list be read (an unreadable one stops every query). It reads no memory: it asks Javis for its tool
+// list. The answer carries no token and no memory text.
+async function status() {
+  const out = { store: 'javis', url: `${ENDPOINT.origin}${ENDPOINT.pathname}` };
+  try {
+    out.hide_list = fs.existsSync(HIDE_FILE) ? 'ok' : 'none';
+    hidden();
+  } catch {
+    out.hide_list = 'unreadable';
+  }
+  try {
+    readToken(profile());
+  } catch (err) {
+    return { ...out, state: 'no_token', detail: err.message };
+  }
+  try {
+    const result = await rpc('tools/list', {}, 5000);
+    return Array.isArray(result.tools) ? { ...out, state: 'ok' } : { ...out, state: 'error', detail: 'Javis 的回答里没有工具列表。' };
+  } catch (err) {
+    if (err.status === 401) return { ...out, state: 'bad_token', detail: err.message };
+    return { ...out, state: err.status ? 'error' : 'down', detail: err.message };
+  }
+}
+
 const HANDLERS = {
   search_memory: searchMemory,
   get_entity: getEntity,
@@ -667,6 +698,9 @@ async function handle(line) {
     case 'tools/call':
       result = await callTool(params);
       break;
+    case 'javmem/status':
+      result = { stores: [await status()] };
+      break;
     default:
       if (isRequest) send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: `Method not found: ${msg.method}` } });
       return; // notifications such as notifications/initialized need no answer
@@ -699,5 +733,5 @@ if (require.main === module) {
 module.exports = {
   VERSION, GUIDE, RAW_NOTE, MAX_TEXT, HIDDEN_LINE, UserError, FOR_CC, OWNER, FIX_HOW,
   clip, day, when, session, matchSession, fit, droppedNote, factLine, relationLine, intIn,
-  searchFacts, entityFacts, findMatches, searchMemory, getEntity, findSessions, getConversation,
+  searchFacts, entityFacts, findMatches, searchMemory, getEntity, findSessions, getConversation, status,
 };

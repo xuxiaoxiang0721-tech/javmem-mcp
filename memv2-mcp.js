@@ -164,7 +164,10 @@ function memv2(method, path, payload, timeoutMs) {
           resolve(data);
         } else {
           const code = data && data.error;
-          reject(new UserError(`${ERRORS[code] || 'memv2 返回了错误'}（HTTP ${res.statusCode}${code ? `，${code}` : ''}）`));
+          const error = new UserError(`${ERRORS[code] || 'memv2 返回了错误'}（HTTP ${res.statusCode}${code ? `，${code}` : ''}）`);
+          error.status = res.statusCode;
+          error.code = code;
+          reject(error);
         }
       });
     });
@@ -337,6 +340,29 @@ async function readRecord(args) {
   return text.length > 30000 ? `${text.slice(0, 30000)}\n…（太长，后面省略）` : text;
 }
 
+// The refusals in which memv2 says the token itself is wrong; any other refusal means it took the token.
+const TOKEN_ERRORS = new Set(['unauthorized', 'unauthorized_client', 'invalid_client_token', 'revoked_principal']);
+
+// For a host's status check (the javmem/status request, not a tool): can memv2 be reached, and does it take this
+// client's token? It reads no memory: it asks for a record that cannot exist, and memv2 checks the token before it
+// looks, so "not found" means the token works. The answer carries no token and no memory text.
+async function status() {
+  const out = { store: 'memv2', url: BASE.origin };
+  try {
+    readToken();
+  } catch (err) {
+    return { ...out, state: 'no_token', detail: err.message };
+  }
+  try {
+    await memv2('GET', '/api/v1/records/javmem-status-check', undefined, 5000);
+    return { ...out, state: 'ok' };
+  } catch (err) {
+    if (err.status === 404 || (err.status === 403 && !TOKEN_ERRORS.has(err.code))) return { ...out, state: 'ok' };
+    if (err.status === 401 || err.status === 403) return { ...out, state: 'bad_token', detail: err.message };
+    return { ...out, state: err.status ? 'error' : 'down', detail: err.message };
+  }
+}
+
 const HANDLERS = { recall, search, search_raw: searchRaw, read_record: readRecord };
 
 async function callTool(params) {
@@ -386,6 +412,9 @@ async function handle(line) {
     case 'tools/call':
       result = await callTool(params);
       break;
+    case 'javmem/status':
+      result = { stores: [await status()] };
+      break;
     default:
       if (isRequest) send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: `Method not found: ${msg.method}` } });
       return; // notifications such as notifications/initialized need no answer
@@ -418,5 +447,5 @@ if (require.main === module) {
 module.exports = {
   VERSION, GUIDE, RAW_NOTE, MAX_TEXT, UserError, FOR_CC, OWNER, FIX_HOW,
   memoryLine, searchLine, recordKeys, degradedNote, clip, excerpt, rawDay, intIn,
-  recallItems, searchItems, rawHits, recall, search, searchRaw, readRecord,
+  recallItems, searchItems, rawHits, recall, search, searchRaw, readRecord, status,
 };

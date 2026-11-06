@@ -392,6 +392,12 @@ async function handle(line) {
     case 'tools/call':
       result = await callTool(params);
       break;
+    case 'javmem/status': // for a host's status check, not a tool: both stores' states, no memory text
+      result = {
+        stores: await Promise.all([memv2.status(), javis.status()]),
+        labels: !LABELS_FILE ? 'none' : (fs.existsSync(LABELS_FILE) ? 'ok' : 'missing'),
+      };
+      break;
     default:
       if (isRequest) send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: `Method not found: ${msg.method}` } });
       return;
