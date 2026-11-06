@@ -379,7 +379,7 @@ async function handle(line) {
       result = {
         protocolVersion: PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0],
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'memory', version: '0.1.0' },
+        serverInfo: { name: 'memory', version: memv2.VERSION },
         instructions: INSTRUCTIONS,
       };
       break;

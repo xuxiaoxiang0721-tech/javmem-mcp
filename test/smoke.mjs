@@ -1,9 +1,10 @@
-// Smoke test for memv2-mcp.js and javis-mcp.js without memv2 or Javis running: the MCP handshake, the tool lists,
-// the owner name in the tool text, and the error a Bot gets when the token is missing or the service is down.
+// Smoke test for memv2-mcp.js and javis-mcp.js without memv2 or Javis running: the MCP handshake (with package.json's
+// version), the tool lists, the owner name in the tool text, and the error a Bot gets when the token is missing or the
+// service is down.
 //   node test/smoke.mjs
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const scratch = mkdtempSync(join(tmpdir(), 'javmem-mcp-'));
 const CLOSED = 'http://127.0.0.1:9'; // discard port: nothing listens
+const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
 /** Start a wrapper, send the requests in order, return the responses by id. */
 function session(script, env, requests) {
@@ -49,7 +51,8 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   writeFileSync(token, 'not-a-real-token\n');
   const a = await session('memv2-mcp.js', { MEMV2_URL: CLOSED, MEMV2_TOKEN_FILE: token }, [
     {}, { method: 'tools/list', params: {} }, { method: 'tools/call', params: { name: 'search', arguments: { query: 'x' } } }]);
-  assert.equal(a.get(0).result.serverInfo.name.length > 0, true);
+  assert.equal(a.get(0).result.serverInfo.name, 'memv2');
+  assert.equal(a.get(0).result.serverInfo.version, version);
   assert.deepEqual(a.get(1).result.tools.map((t) => t.name), ['recall', 'search', 'search_raw', 'read_record']);
   assert.match(a.get(0).result.instructions, /memv2 是用户的事实记忆/);
   assert.equal(a.get(2).result.isError, true);
@@ -71,6 +74,7 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   writeFileSync(profile, `JAVIS_SOURCES=acct-a\nJAVIS_TOKEN_FROM=${tokenFile}\n`);
   const a = await session('javis-mcp.js', { JAVIS_URL: `${CLOSED}/mcp`, JAVIS_TOKEN_FILE: profile }, [
     {}, { method: 'tools/list', params: {} }, { method: 'tools/call', params: { name: 'search_memory', arguments: { query: 'x' } } }]);
+  assert.equal(a.get(0).result.serverInfo.version, version);
   assert.deepEqual(a.get(1).result.tools.map((t) => t.name), ['search_memory', 'get_entity', 'find_sessions', 'get_conversation']);
   assert.match(a.get(0).result.instructions, /Javis 存的是用户以前和 AI 的对话原文/);
   assert.equal(a.get(2).result.isError, true);
@@ -89,6 +93,7 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
     { method: 'tools/call', params: { name: 'read', arguments: {} } },
     { method: 'tools/call', params: { name: 'read', arguments: { record_key: 'a', session_id: 'b' } } },
     { method: 'tools/call', params: { name: 'person', arguments: { name: 'x' } } }]);
+  assert.equal(a.get(0).result.serverInfo.version, version);
   assert.deepEqual(a.get(1).result.tools.map((t) => t.name), ['recall', 'search', 'search_raw', 'person', 'read']);
   assert.match(a.get(0).result.instructions, /同时查 memv2（用户的事实记忆）和图库/);
   assert.equal(a.get(2).result.isError, true);

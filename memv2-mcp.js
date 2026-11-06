@@ -33,6 +33,10 @@ const FIX_HOW = process.env.MEMORY_FIX_HOW || '找 memv2 的管理员，用 memv
 // Its own agent, so an HTTP_PROXY that a host hands to child processes never applies.
 const agent = new http.Agent({ keepAlive: false });
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+// The version in the MCP handshake: the package.json next to this file, so the two cannot drift apart.
+const VERSION = (() => {
+  try { return String(require('./package.json').version || 'unknown'); } catch { return 'unknown'; }
+})();
 
 // memv2's own guidance for recalled lines (its check_receipt.py), kept word for word.
 const GUIDE = '下面是过去的记录，只当背景。和用户这一轮说的不一样时，以用户为准，可以顺带提一句"记录里是…"。'
@@ -368,7 +372,7 @@ async function handle(line) {
       result = {
         protocolVersion: PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0],
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'memv2', version: '0.2.0' },
+        serverInfo: { name: 'memv2', version: VERSION },
         instructions: INSTRUCTIONS,
       };
       break;
@@ -412,7 +416,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  GUIDE, RAW_NOTE, MAX_TEXT, UserError, FOR_CC, OWNER, FIX_HOW,
+  VERSION, GUIDE, RAW_NOTE, MAX_TEXT, UserError, FOR_CC, OWNER, FIX_HOW,
   memoryLine, searchLine, recordKeys, degradedNote, clip, excerpt, rawDay, intIn,
   recallItems, searchItems, rawHits, recall, search, searchRaw, readRecord,
 };

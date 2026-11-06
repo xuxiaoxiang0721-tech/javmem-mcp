@@ -47,6 +47,10 @@ const HIDDEN_LINE = `（这一条已按${OWNER}的要求不再显示）`;
 // Its own agent, so an HTTP_PROXY that a host hands to child processes never applies.
 const agent = new http.Agent({ keepAlive: false });
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+// The version in the MCP handshake: the package.json next to this file, so the two cannot drift apart.
+const VERSION = (() => {
+  try { return String(require('./package.json').version || 'unknown'); } catch { return 'unknown'; }
+})();
 // Longest text one call returns, so a single result stays well inside a small model's window.
 const MAX_TEXT = 8000;
 
@@ -649,7 +653,7 @@ async function handle(line) {
       result = {
         protocolVersion: PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0],
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'javis', version: '0.2.0' },
+        serverInfo: { name: 'javis', version: VERSION },
         instructions: INSTRUCTIONS,
       };
       break;
@@ -693,7 +697,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  GUIDE, RAW_NOTE, MAX_TEXT, HIDDEN_LINE, UserError, FOR_CC, OWNER, FIX_HOW,
+  VERSION, GUIDE, RAW_NOTE, MAX_TEXT, HIDDEN_LINE, UserError, FOR_CC, OWNER, FIX_HOW,
   clip, day, when, session, matchSession, fit, droppedNote, factLine, relationLine, intIn,
   searchFacts, entityFacts, findMatches, searchMemory, getEntity, findSessions, getConversation,
 };
