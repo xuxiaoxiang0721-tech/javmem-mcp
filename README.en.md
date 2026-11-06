@@ -100,15 +100,16 @@ Or the two stores apart:
 - Install the companion plugin [javmem-dsh-plugin](https://github.com/xuxiaoxiang0721-tech/javmem-dsh-plugin): tools per Bot id, no cards (recommended).
 - Or one private MCP server per Bot: command `node /path/to/memory-mcp.js`, with that Bot's token file paths in the environment.
 
-## The three servers
+## The four servers
 
 | Server | Talks to | Tools |
 |---|---|---|
 | `memory-mcp.js` (command `javmem-mcp`) | **both stores as one tool** (recommended) | `recall`, `search`, `search_raw`, `person`, `read` |
 | `memv2-mcp.js` | memv2, a fact memory service (its HTTP read API) | `recall`, `search`, `search_raw`, `read_record` |
 | `javis-mcp.js` | Javis, a Graphiti + Neo4j memory graph (through its own MCP endpoint) | `search_memory`, `get_entity`, `find_sessions`, `get_conversation` |
+| `local-mcp.js` (command `javmem-local`) | the local store: one SQLite file on this machine, zero setup | `recall`, `search`, `search_raw`, `person`, `read` |
 
-All three speak stdio, have no dependencies and use only Node's built-in modules (Node 20 or later). Tool descriptions and results are in Chinese and kept short for small models' context.
+All four speak stdio, have no dependencies and use only Node's built-in modules (Node 20 or later; the local store uses Node's own SQLite, Node 22.5 or later). Tool descriptions and results are in Chinese and kept short for small models' context.
 
 ## The combined server memory-mcp.js
 
@@ -132,6 +133,15 @@ One MCP server over both stores, five tools instead of the eight of the two apar
   ```
 
   `l` is one of `两边一致` (both agree), `两边不同` (they differ; `diff` lists the differing fact), `只在 memv2` (memv2 only), `只在图库` (graph only). Your own cross-check program writes it, with ids and labels only, never text; without it there are no marks.
+
+## The local store local-mcp.js (zero setup)
+
+No memv2, no Javis, no service to start: it reads one local store file (`JAVMEM_LOCAL_DB`) holding past conversations (javmem-dsh-plugin builds one per Bot from DSH's sessions) and, later, memory inherited from other AI tools.
+
+- The tools have the same names as the combined set (`recall`, `search`, `search_raw`, `person`, `read`), so a Bot's rules stay the same when its backend changes.
+- Full-text search with SQLite FTS5. Chinese is indexed as pairs of neighbouring characters (游泳课 → 游泳, 泳课), so two-character words are found inside a sentence; other text by words. `recall` scores the pieces of a whole sentence, `search` takes keywords, `search_raw` the exact words.
+- It opens the store read-only; while the file does not exist yet it answers "nothing yet" instead of failing. `javmem/status` reports sessions, messages and the last update.
+- `local-store.js` reads and writes the store; the writer (the DSH plugin's indexer) shares it.
 
 ## What they do
 
@@ -200,6 +210,13 @@ The servers store no memory; they only query the two memory stores for the Bots.
 | `JAVIS_HIDE_FILE` | the hide list, default `hidden.json` next to the server (missing = nothing hidden) |
 | `JAVIS_VERIFY_FILE` | the verdict file, default `verify/verdicts.jsonl` next to the server (missing = every fact gets the rule check) |
 | `JAVIS_AUDIENCE` | as above |
+
+### local-mcp.js
+
+| Variable | Meaning |
+|---|---|
+| `JAVMEM_LOCAL_DB` | required. The local store file; a file that does not exist yet = nothing stored yet |
+| `MEMORY_AUDIENCE` | `cc` = for Claude Code (tools marked read-only) |
 
 ### Shared by all three
 

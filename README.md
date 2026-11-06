@@ -100,15 +100,16 @@ claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_T
 - 装配套插件 [javmem-dsh-plugin](https://github.com/xuxiaoxiang0721-tech/javmem-dsh-plugin)：按 Bot 编号自动挂工具，不用卡片（推荐）。
 - 或者每个 Bot 一个私有 MCP：命令 `node /path/to/memory-mcp.js`，环境变量填这个 Bot 的令牌文件路径。
 
-## 三个程序
+## 四个程序
 
 | 程序 | 接的是 | 工具 |
 |---|---|---|
 | `memory-mcp.js`（命令 `javmem-mcp`） | **两个库合起来的一个工具**（推荐） | `recall`、`search`、`search_raw`、`person`、`read` |
 | `memv2-mcp.js` | memv2：事实记忆服务（HTTP 读接口） | `recall`、`search`、`search_raw`、`read_record` |
 | `javis-mcp.js` | Javis：Graphiti + Neo4j 的记忆图谱（通过它自带的 MCP 端点） | `search_memory`、`get_entity`、`find_sessions`、`get_conversation` |
+| `local-mcp.js`（命令 `javmem-local`） | 本地库：本机的一个 SQLite 文件，零准备 | `recall`、`search`、`search_raw`、`person`、`read` |
 
-三个程序都走 stdio，没有依赖，只用 Node 自带的模块（Node 20 以上）。工具说明和返回内容是中文，按小模型的上下文写得很短。
+四个程序都走 stdio，没有依赖，只用 Node 自带的模块（Node 20 以上；本地库用 Node 自带的 SQLite，要 Node 22.5 以上）。工具说明和返回内容是中文，按小模型的上下文写得很短。
 
 ## 合起来的工具 memory-mcp.js
 
@@ -132,6 +133,15 @@ claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_T
   ```
 
   `l` 是 `两边一致`、`两边不同`（`diff` 列出说法不同的那条）、`只在 memv2`、`只在图库` 之一。这个文件由你自己的对照程序生成，只放编号和标签，不放内容；没有这个文件就不标。
+
+## 本地库 local-mcp.js（零准备）
+
+不用 memv2 和 Javis，也不用另起服务：它读一个本地库文件（`JAVMEM_LOCAL_DB`），里面是以前的对话（javmem-dsh-plugin 按 Bot 从 DSH 的会话里建，一个 Bot 一个文件），以后还有从别的 AI 工具继承来的记忆。
+
+- 工具和合起来的那套同名（`recall`、`search`、`search_raw`、`person`、`read`），Bot 换后端时规则不用改。
+- 全文索引用 SQLite 的 FTS5。中文按相邻两个字切开再建索引（「游泳课」→「游泳」「泳课」），所以两个字的词也能在整句里找到；英文和数字按词。`recall` 按整句里的片段打分，`search` 按关键词，`search_raw` 逐字找。
+- 只读打开；库文件还不存在时回答「还没有内容」，不报错。`javmem/status` 报有几个会话、几条对话、最近一次更新。
+- 库的读写模块是 `local-store.js`，写入方（DSH 插件的索引程序）和它共用。
 
 ## 做了什么
 
@@ -200,6 +210,13 @@ claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_T
 | `JAVIS_HIDE_FILE` | 隐藏名单，默认程序旁边的 `hidden.json`（没有 = 不隐藏） |
 | `JAVIS_VERIFY_FILE` | 判定文件，默认程序旁边的 `verify/verdicts.jsonl`（没有 = 每条事实都按规则查） |
 | `JAVIS_AUDIENCE` | 同上 |
+
+### local-mcp.js
+
+| 变量 | 说明 |
+|---|---|
+| `JAVMEM_LOCAL_DB` | 必填。本地库文件的路径；文件还不存在 = 还没有内容 |
+| `MEMORY_AUDIENCE` | `cc` = 给 Claude Code 用（工具标成只读） |
 
 ### 三个程序共用
 

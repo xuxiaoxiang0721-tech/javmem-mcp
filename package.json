@@ -17,12 +17,15 @@
     "javmem-mcp": "memory-mcp.js",
     "memory-mcp": "memory-mcp.js",
     "memv2-mcp": "memv2-mcp.js",
-    "javis-mcp": "javis-mcp.js"
+    "javis-mcp": "javis-mcp.js",
+    "javmem-local": "local-mcp.js"
   },
   "files": [
     "memory-mcp.js",
     "memv2-mcp.js",
     "javis-mcp.js",
+    "local-store.js",
+    "local-mcp.js",
     "demo.js",
     "demo/",
     "scripts/demo.mjs",

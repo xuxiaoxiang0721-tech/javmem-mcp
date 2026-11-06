@@ -202,6 +202,48 @@ const ok = (label) => { passed += 1; console.log('ok', label); };
   ok('demo backend: thirteen tools on made-up data, marks, the dropped fact, per-Bot filters');
 }
 
+// local-mcp.js on a local store filled with made-up messages: the five tools, Chinese words inside sentences, the
+// marks for inherited memory, and javmem/status; a missing store answers "nothing yet" instead of failing.
+{
+  const { createRequire } = await import('node:module');
+  const { LocalStore } = createRequire(import.meta.url)('../local-store.js');
+  const db = join(scratch, 'local.sqlite');
+  const s = new LocalStore(db);
+  s.add({ id: 'sess-1', title: '游泳课', origin: 'session' }, [
+    { seq: 3, role: 'user', time: '2026-09-14T19:02:00+08:00', text: '游泳课改到每周三下午了，教练姓周。' },
+    { seq: 5, role: 'assistant', time: '2026-09-14T19:03:00+08:00', text: '记下了，小雨每周三下午跟周教练上游泳课。' },
+    { seq: 9, role: 'user', time: '2026-10-25T18:20:00+08:00', text: '老陈说他 12 月调去深圳分公司了。' },
+  ], 12);
+  s.add({ id: 'inherit:grok-1', title: 'Grok 的记忆', origin: 'inherited:Grok', note: '2026-10-30 导出' }, [
+    { seq: 1, role: 'fact', time: '2026-05-01', text: '小明对芒果过敏。' },
+  ], 1);
+  s.close();
+  const call = (name, args) => ({ method: 'tools/call', params: { name, arguments: args } });
+  const env = { JAVMEM_LOCAL_DB: db, MEMORY_OWNER: '小明' };
+  const a = await session('local-mcp.js', env, [{},
+    call('recall', { query: '小雨的游泳课是哪天' }), call('search', { query: '深圳' }), call('search_raw', { query: '周教练' }),
+    call('person', { name: '老陈' }), call('read', { session_id: 'sess-1' }), call('recall', { query: '芒果' }),
+    { method: 'javmem/status', params: {} }, { method: 'tools/list', params: {} }]);
+  const t = (id) => text(a.get(id).result);
+  assert.equal(a.get(0).result.serverInfo.version, version);
+  assert.deepEqual(a.get(8).result.tools.map((x) => x.name), ['recall', 'search', 'search_raw', 'person', 'read']);
+  assert.match(t(1), /\[2026-09-14\] 小明：游泳课改到每周三下午了/);
+  assert.match(t(2), /1\. \[2026-10-25\] 小明：老陈说他 12 月调去深圳分公司了。（《游泳课》，消息号 m3）/);
+  assert.match(t(3), /\[2026-09-14\] 你：记下了，小雨每周三下午跟周教练上游泳课。/);
+  assert.match(t(4), /【提到「老陈」的话（按时间）】/);
+  assert.match(t(5), /《游泳课》（会话号 sess-1） 2026-09-14 到 2026-10-25\nm1 \[2026-09-14\] 小明：[\s\S]*已读完。/);
+  assert.match(t(6), /\[2026-05-01\] 记下的事实：小明对芒果过敏。（继承自 Grok，2026-10-30 导出，消息号 m4）/);
+  const st = a.get(7).result.stores[0];
+  assert.equal(st.state, 'ok');
+  assert.match(st.detail, /^1 个会话，3 条对话；继承来的 1 条（1 个包）/);
+  const none = await session('local-mcp.js', { JAVMEM_LOCAL_DB: join(scratch, 'none.sqlite') }, [{},
+    call('recall', { query: 'x' }), { method: 'javmem/status', params: {} }]);
+  assert.match(text(none.get(1).result), /本地记忆库里还没有内容/);
+  assert.notEqual(none.get(1).result.isError, true);
+  assert.equal(none.get(2).result.stores[0].state, 'empty');
+  ok('local store: five tools, Chinese words inside sentences, inherited marks, status, an empty store');
+}
+
 // scripts/eval.mjs on the demo questions: the counts it prints, and nothing but counts.
 {
   const { spawnSync } = await import('node:child_process');
