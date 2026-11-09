@@ -14,5 +14,5 @@
    git push origin v<版本>
    ```
 4. **发 GitHub Release**：仓库的 Releases 页 → Draft a new release → 选标签 `v<版本>`，标题 `v<版本>`，说明贴 `dist/release-notes.md`，附件传 `dist/javmem-mcp.tgz`。
-5. **发 npm**：先 `npm login`（自己登录），再 `npm publish dist/javmem-mcp-<版本>.tgz`。
+5. **发 npm**：先 `npm login`（自己登录），再 `npm publish ./dist/javmem-mcp-<版本>.tgz`。路径前的 `./` 不能省，否则 npm 会把它当成 GitHub 仓库。账号开了两步验证，发的时候要在终端里确认，所以这一步要主人自己跑。
 6. **插件那边**：在 javmem-dsh-plugin 里运行 `node scripts/vendor-mcp.mjs <本仓库目录>`，把新版服务复制过去，再按那边的 RELEASING.md 发版。
