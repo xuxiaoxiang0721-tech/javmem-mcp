@@ -187,12 +187,12 @@ npx -y javmem-mcp estimate ~/Downloads/conversations.json                       
 
 ## The graph on the official Graphiti server (backend C)
 
-Javis is not public, so the graph can be the official [Graphiti](https://github.com/getzep/graphiti) MCP server (maintained by Zep) instead: `backend/graphiti/` has a recipe (one Docker container; models from OpenAI, DeepSeek with Qwen, or a local Ollama), see [backend/graphiti/README.md](backend/graphiti/README.md).
+Javis is not public, so the graph can be the official [Graphiti](https://github.com/getzep/graphiti) MCP server (maintained by Zep) instead: `backend/graphiti/` has a recipe (the official server and Neo4j, two Docker containers, or FalkorDB for one container less; models from OpenAI, DeepSeek with Qwen, or a local Ollama), see [backend/graphiti/README.md](backend/graphiti/README.md).
 
 - **In**: `javmem-feed` sends the local store's conversations to Graphiti in episodes of up to 8 messages, each once; a conversation goes when it has been quiet for 30 minutes or has 8 new messages; a daily token budget (default 1,000,000 per store) stops it until the next day; what Graphiti lost (its queue is in memory) is sent again after half an hour. It prints counts only.
 - **Out**: `javis-mcp.js` with `JAVIS_BACKEND=graphiti` keeps its four tools: facts and people from Graphiti, the original words from the local store (the official server cannot search them). The combined `memory-mcp.js` works on top of it.
 - One group per Bot (`GRAPHITI_GROUP_ID`), invisible to the others. Read-only: queries change nothing in the graph.
-- Cost: measured 2026-11-06 (official server 1.1.3 with gpt-6-luna, 23 made-up messages in 9 episodes) about 15,000 tokens per episode; counted as 20,000, roughly 2.5 million tokens per 1,000 messages. A local Ollama costs nothing but is slow.
+- Cost: measured 2026-11-06 (official server 1.1.3 with gpt-6-luna, 23 made-up messages in 9 episodes) about 15,000 tokens per episode; measured again on Neo4j 2026-11-09, about the same. Counted as 20,000, roughly 2.5 million tokens per 1,000 messages. A local Ollama costs nothing but is slow.
 
 ## The fact store as memv2-lite (backend B)
 
@@ -214,9 +214,9 @@ The original memv2 is not public, so the package carries a small public one, `me
 npx -y javmem-mcp setup
 ```
 
-It lists the four backends (D local store, B fact store, C graph, A full set) with what each keeps, costs and needs, then asks: which models (by default the good gpt-6-luna; or DeepSeek with Qwen, or a local Ollama), how many tokens a Bot may spend a day, whose memory it is, which Bots. Give it a local store or inherited packages to import and it quotes from the actual number of stretches. **It writes nothing until you say yes**, then fills one folder (default `./javmem`): the model settings `.env`, the compose files or start scripts, memv2-lite's store and tokens, and `plugin-config.json` for the DSH plugin. It starts nothing and sends nothing anywhere, and ends with the next steps.
+It lists the four backends (D local store, B fact store, C graph, A full set) with what each keeps, costs and needs, then asks: which models (by default the good gpt-6-luna; or DeepSeek with Qwen, or a local Ollama), which graph database (Neo4j by default, or FalkorDB), how many tokens a Bot may spend a day, whose memory it is, which Bots. Give it a local store or inherited packages to import and it quotes from the actual number of stretches. **It writes nothing until you say yes**, then fills one folder (default `./javmem`): the model settings `.env`, the compose files or start scripts, memv2-lite's store and tokens, and `plugin-config.json` for the DSH plugin. It starts nothing and sends nothing anywhere, and ends with the next steps.
 
-Without questions: `npx -y javmem-mcp setup --backend A|B|C|D --models openai|deepseek|ollama --owner Alex --bots tob --daily-tokens 1000000 --yes`.
+Without questions: `npx -y javmem-mcp setup --backend A|B|C|D --models openai|deepseek|ollama --graph-store neo4j|falkordb --owner Alex --bots tob --daily-tokens 1000000 --yes`.
 
 ## What it costs
 

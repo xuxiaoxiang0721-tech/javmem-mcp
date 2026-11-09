@@ -484,15 +484,21 @@ else {
   assert.deepEqual([est.messages, est.inherited, est.packages, est.stretches, est.episodes, est.tokens.memv2, est.tokens.graphiti],
     [0, 5, 1, 0, 1, 0, 20000], 'an inherited package costs the fact store nothing');
   const dir = join(scratch, 'setup');
-  const no = cli(['setup', '--dir', join(dir, 'no')], 'C\n2\n\n\n500000\n小明\ntob\n\nn\n');
+  const no = cli(['setup', '--dir', join(dir, 'no')], 'C\n2\n\n\n500000\n2\n小明\ntob\n\nn\n');
   assert.equal(no.status, 1);
   assert.match(no.stdout, /C     图谱（Graphiti 官方）[\s\S]*约 250 万 token/);
+  assert.match(no.stdout, /图数据库[\s\S]*1 Neo4j（默认）[\s\S]*2 FalkorDB/);
   assert.match(no.stdout, /报价：\n  你选了 C 图谱（Graphiti 官方），每 1,000 条消息大约花 约 250 万 token；每个 Bot 每天最多 500,000 token。/);
   assert.match(no.stdout, /没写任何文件。/);
   assert.ok(!existsSync(join(dir, 'no')), 'a no writes nothing');
   const run = (b) => cli(['setup', '--backend', b, '--models', 'openai', '--owner', '小明', '--bots', 'tob', '--dir', join(dir, b), '--yes',
     '--estimate', join(root, 'demo', 'inherit-grok.json')]);
-  for (const b of ['A', 'B', 'C', 'D']) assert.equal(run(b).status, 0, `setup ${b}`);
+  const printed = {};
+  for (const b of ['A', 'B', 'C', 'D']) {
+    const r = run(b);
+    assert.equal(r.status, 0, `setup ${b}`);
+    printed[b] = r.stdout;
+  }
   const cfg = (b) => JSON.parse(readFileSync(join(dir, b, 'plugin-config.json'), 'utf8'));
   assert.deepEqual(['A', 'B', 'C', 'D'].map((b) => cfg(b).backend), ['full', 'memv2', 'graphiti', 'local']);
   assert.ok(!existsSync(join(dir, 'D', '.env')), 'the local store needs no models');
@@ -510,7 +516,28 @@ else {
   assert.ok(existsSync(join(dir, 'C', 'docker-compose.yml')) && existsSync(join(dir, 'C', 'config.yaml')));
   assert.equal(cfg('C').backends.graphiti.group, 'bot-{slug}');
   if (process.platform !== 'win32') assert.equal(statSync(join(dir, 'B', '.env')).mode & 0o777, 0o600);
-  ok('setup wizard: four choices with their cost, the quote first, nothing on a no, each backend\'s files; estimate counts only');
+  // The graph database: Neo4j unless FalkorDB is chosen, with a password of its own that is never printed.
+  for (const b of ['A', 'C']) {
+    const yml = readFileSync(join(dir, b, 'docker-compose.yml'), 'utf8');
+    assert.ok(yml.includes('neo4j:5.26-community') && yml.includes('1.1.3-standalone') && yml.includes('GRAPHITI_DB: neo4j'), `${b} uses Neo4j by default`);
+    assert.ok(!/redis-cli|falkordb\/data/.test(yml), `${b} has nothing of FalkorDB in it`);
+    const password = readFileSync(join(dir, b, '.env'), 'utf8').match(/^NEO4J_PASSWORD=([0-9a-f]{32})$/m);
+    assert.ok(password, `${b} has its own Neo4j password`);
+    assert.ok(!printed[b].includes(password[1]), `${b}: the password is not printed`);
+    assert.match(printed[b], /http:\/\/127\.0\.0\.1:17474/);
+  }
+  assert.notEqual(readFileSync(join(dir, 'A', '.env'), 'utf8').match(/^NEO4J_PASSWORD=(.*)$/m)[1],
+    readFileSync(join(dir, 'C', '.env'), 'utf8').match(/^NEO4J_PASSWORD=(.*)$/m)[1]);
+  assert.ok(!/NEO4J_PASSWORD/.test(readFileSync(join(dir, 'B', '.env'), 'utf8')), 'the fact store alone needs no graph database');
+  assert.match(readFileSync(join(dir, 'C', 'config.yaml'), 'utf8'), /provider: \$\{GRAPHITI_DB:neo4j\}/);
+  for (const b of ['A', 'C']) {
+    const d = join(dir, `${b}-falkordb`);
+    assert.equal(cli(['setup', '--backend', b, '--models', 'openai', '--graph-store', 'falkordb', '--dir', d, '--yes']).status, 0);
+    const yml = readFileSync(join(d, 'docker-compose.yml'), 'utf8');
+    assert.ok(yml.includes('GRAPHITI_DB: falkordb') && yml.includes('falkordb/data') && !yml.includes('neo4j:5.26'), `${b} with FalkorDB`);
+    assert.ok(!/NEO4J_PASSWORD/.test(readFileSync(join(d, '.env'), 'utf8')), `${b} with FalkorDB needs no Neo4j password`);
+  }
+  ok('setup wizard: four choices with their cost, the quote first, nothing on a no, each backend\'s files, Neo4j unless FalkorDB is chosen; estimate counts only');
 }
 
 // javmem-inherit history (item 20): made-up exports of five tools; only what people typed and the AI answered goes in

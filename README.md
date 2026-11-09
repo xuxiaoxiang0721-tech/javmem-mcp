@@ -187,12 +187,12 @@ npx -y javmem-mcp estimate ~/Downloads/conversations.json                       
 
 ## 图谱接 Graphiti 官方服务（后端 C）
 
-Javis 那层没有公开，图谱可以换成 [Graphiti](https://github.com/getzep/graphiti) 官方的 MCP 服务（Zep 维护）：`backend/graphiti/` 里有一份菜谱（一个 Docker 容器，模型可选 OpenAI、DeepSeek 加千问、或本地 Ollama），见 [backend/graphiti/README.md](backend/graphiti/README.md)。
+Javis 那层没有公开，图谱可以换成 [Graphiti](https://github.com/getzep/graphiti) 官方的 MCP 服务（Zep 维护）：`backend/graphiti/` 里有一份菜谱（官方服务加 Neo4j 两个 Docker 容器，想少一个容器可以选 FalkorDB；模型可选 OpenAI、DeepSeek 加千问、或本地 Ollama），见 [backend/graphiti/README.md](backend/graphiti/README.md)。
 
 - **送进去**：`javmem-feed` 把本地库里的对话一段一段（最多 8 条）送进 Graphiti，每段只送一次；对话停了 30 分钟或攒够 8 条才送；每天有 token 上限（默认每个库 100 万），到了就停，第二天接着送；Graphiti 丢了的（它的队列在内存里）半小时后重送。只打印条数。
 - **查出来**：`javis-mcp.js` 设 `JAVIS_BACKEND=graphiti`，四个工具照旧：事实和人从 Graphiti 来，原话从本地库来（官方服务不能按原话搜）。合起来的 `memory-mcp.js` 也能接。
 - 每个 Bot 一个组（`GRAPHITI_GROUP_ID`），互相看不到。只读：查的时候不改图谱。
-- 花多少：2026-11-06 自测（官方服务 1.1.3 + gpt-6-luna，虚构的 23 条消息切成 9 段）每段约 1.5 万 token；按每段 2 万估，约合每 1,000 条消息 250 万 token。本地 Ollama 不花钱但慢。
+- 花多少：2026-11-06 自测（官方服务 1.1.3 + gpt-6-luna，虚构的 23 条消息切成 9 段）每段约 1.5 万 token；2026-11-09 换成 Neo4j 再测，每段也约 1.5 万。按每段 2 万估，约合每 1,000 条消息 250 万 token。本地 Ollama 不花钱但慢。
 
 ## 事实库用 memv2 精简版（后端 B）
 
@@ -214,9 +214,9 @@ Javis 那层没有公开，图谱可以换成 [Graphiti](https://github.com/getz
 npx -y javmem-mcp setup
 ```
 
-它先列出四种后端（D 本地库、B 事实库、C 图谱、A 全套）记什么、花多少、要装什么，再问：用哪种模型（默认质量好的 gpt-6-luna，也可以选 DeepSeek 加千问、或本机 Ollama）、每个 Bot 每天最多花多少 token、记忆是谁的、哪些 Bot。有要一次导入的历史，给它本地库或继承包的路径，它按实际段数报价。**你说好了才写文件**，写进一个文件夹（默认 `./javmem`）：模型设置 `.env`、要起的 compose 或启动脚本、memv2 精简版的库和令牌、给 DSH 插件的 `plugin-config.json`。它不启动任何东西，也不往外发东西。最后打印接下来要做的几步。
+它先列出四种后端（D 本地库、B 事实库、C 图谱、A 全套）记什么、花多少、要装什么，再问：用哪种模型（默认质量好的 gpt-6-luna，也可以选 DeepSeek 加千问、或本机 Ollama）、图谱放在哪种图数据库（默认 Neo4j，也可以选 FalkorDB）、每个 Bot 每天最多花多少 token、记忆是谁的、哪些 Bot。有要一次导入的历史，给它本地库或继承包的路径，它按实际段数报价。**你说好了才写文件**，写进一个文件夹（默认 `./javmem`）：模型设置 `.env`、要起的 compose 或启动脚本、memv2 精简版的库和令牌、给 DSH 插件的 `plugin-config.json`。它不启动任何东西，也不往外发东西。最后打印接下来要做的几步。
 
-不交互的写法：`npx -y javmem-mcp setup --backend A|B|C|D --models openai|deepseek|ollama --owner 小明 --bots tob --daily-tokens 1000000 --yes`。
+不交互的写法：`npx -y javmem-mcp setup --backend A|B|C|D --models openai|deepseek|ollama --graph-store neo4j|falkordb --owner 小明 --bots tob --daily-tokens 1000000 --yes`。
 
 ## 花多少
 

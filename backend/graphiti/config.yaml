@@ -28,8 +28,14 @@ embedder:
       api_url: ${EMBEDDER_API_URL:https://api.openai.com/v1}
 
 database:
-  provider: "falkordb"
+  # neo4j by default; docker-compose.falkordb.yml sets GRAPHITI_DB=falkordb.
+  provider: ${GRAPHITI_DB:neo4j}
   providers:
+    neo4j:
+      uri: ${NEO4J_URI:bolt://neo4j:7687}
+      username: ${NEO4J_USER:neo4j}
+      password: ${NEO4J_PASSWORD:}
+      database: ${NEO4J_DATABASE:neo4j}
     falkordb:
       uri: ${FALKORDB_URI:redis://localhost:6379}
       password: ${FALKORDB_PASSWORD:}

@@ -1,6 +1,6 @@
 {
   "name": "javmem-mcp",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "javmem: per-Bot memory for chat Bots and Claude Code. MCP servers over a zero-setup local store (Chinese full-text), a small public fact store (memv2-lite) and the official Graphiti graph, chosen at install with a quote and a daily token cap; import past conversations and memory from other AIs; read-only tools with sources and cross-check marks.",
   "license": "MIT",
   "author": "xuxiaoxiang0721-tech",

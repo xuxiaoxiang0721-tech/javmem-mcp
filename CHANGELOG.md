@@ -1,5 +1,19 @@
 # 更新记录 / Changelog
 
+## 0.4.1（2026-11-09）
+
+- 图谱默认换成 Neo4j：后端 C 和 A 现在是 Graphiti 官方服务（`1.1.3-standalone`）加 Neo4j 5.26 社区版两个容器；FalkorDB 留作可选（`docker-compose.falkordb.yml`，向导里选，或 `--graph-store falkordb`）。工具和用法不变。已经装好的不受影响，两种数据库之间不迁移数据。
+- 安装向导多问一句用哪种图数据库；选 Neo4j 时自动生成密码写进 `.env`，不显示出来。
+- Neo4j 只开在本机，端口默认 17474、17687，不和电脑上已有的 Neo4j 抢；`http://127.0.0.1:17474` 可以看图。
+- 2026-11-09 实测（虚构数据，gpt-6-luna）：9 段全部进图谱，每段约 1.5 万 token，两个 Bot 互相查不到，停掉再启动数据还在。模型抽取每次不完全一样，见 `backend/graphiti/README.md` 的「已知的限制」。
+
+English:
+
+- The graph now uses Neo4j by default: backends C and A are the official Graphiti server (`1.1.3-standalone`) and Neo4j 5.26 community, two containers; FalkorDB stays as a choice (`docker-compose.falkordb.yml`, in the wizard, or `--graph-store falkordb`). Same tools. Existing installs are not touched, and data does not move between the two.
+- The wizard asks which graph database; with Neo4j it generates a password into `.env` and does not print it.
+- Neo4j listens on this computer only, on ports 17474 and 17687, so a Neo4j already there is left alone; `http://127.0.0.1:17474` shows the graph.
+- Measured 2026-11-09 (made-up data, gpt-6-luna): all 9 episodes in, about 15,000 tokens each, two Bots could not find each other's words, the data survived a stop and start. The model's extraction varies between runs; see Known limits in `backend/graphiti/README.md`.
+
 ## 0.4.0（2026-11-09）
 
 - 第一次发 npm，包名 `javmem-mcp`（0.3.0 只发了 GitHub Release）。

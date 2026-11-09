@@ -5,10 +5,11 @@
 //             settings (.env), the compose files a backend needs, the memv2-lite store with its tokens, and the
 //             config for the DSH plugin and for Claude Code. It starts nothing and sends nothing anywhere.
 //   estimate  counts what a local store or javmem packages hold and what extracting them would cost per backend.
-// Non-interactive: setup --backend A|B|C|D [--models openai|deepseek|ollama] [--bots a,b] [--owner name]
-//                  [--daily-tokens N] [--dir folder] [--estimate path] --yes
+// Non-interactive: setup --backend A|B|C|D [--models openai|deepseek|ollama] [--graph-store neo4j|falkordb] [--bots a,b]
+//                  [--owner name] [--daily-tokens N] [--dir folder] [--estimate path] --yes
 'use strict';
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -29,7 +30,7 @@ const RATES = {
 const BACKENDS = {
   D: { key: 'local', name: '本地库', what: '原话，按词搜（中文也行）', per1000: '0（不花钱）', needs: '什么都不用装' },
   B: { key: 'memv2', name: '事实库（memv2 精简版）', what: 'D 加上抽出来的事实，分得清新旧', per1000: '约 60 万 token', needs: 'Node 22.5 以上，不用 Docker' },
-  C: { key: 'graphiti', name: '图谱（Graphiti 官方）', what: 'D 加上人和事的关系、时间线', per1000: '约 250 万 token', needs: 'Docker，约 11 GB 硬盘' },
+  C: { key: 'graphiti', name: '图谱（Graphiti 官方）', what: 'D 加上人和事的关系、时间线', per1000: '约 250 万 token', needs: 'Docker，约 12 GB 硬盘' },
   A: { key: 'full', name: '全套（事实库加图谱）', what: 'B 加 C，两个库对照着回答', per1000: '约 310 万 token', needs: 'Docker，约 12 GB 硬盘' },
 };
 
@@ -49,6 +50,12 @@ const MODELS = {
     env: { MODEL_NAME: 'qwen3:14b', OPENAI_API_KEY: 'ollama', LLM_STRUCTURED_OUTPUT_MODE: 'json_object', EMBEDDER_MODEL: 'qwen3-embedding:0.6b', EMBEDDER_DIM: '1024', EMBEDDER_API_KEY: 'ollama', SEMAPHORE_LIMIT: '1' },
     local: true,
   },
+};
+
+// The graph database behind Graphiti (backends C and A).
+const GRAPH_STORES = {
+  neo4j: { label: 'Neo4j（默认）：两个容器，有网页可以看图，官方配置给它最多约 1.5 GB 内存', compose: 'docker-compose.yml' },
+  falkordb: { label: 'FalkorDB：和官方服务打包在一个容器里，少一个容器，没有 Neo4j 那个看图的网页', compose: 'docker-compose.falkordb.yml' },
 };
 
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
@@ -132,6 +139,8 @@ function envText(models, keys, extra) {
     env.EMBEDDER_API_KEY = (m.sameKey ? keys.llm : keys.embed) || '在这里填向量模型的钥匙';
   }
   env.MEMV2_DAILY_TOKENS = String(extra.dailyTokens);
+  // Neo4j's password stays in this file; nothing prints it.
+  if (extra.neo4jPassword) env.NEO4J_PASSWORD = extra.neo4jPassword;
   if (extra.ports) Object.assign(env, extra.ports);
   for (const [k, v] of Object.entries(env)) lines.push(`${k}=${v}`);
   return `${lines.join('\n')}\n`;
@@ -147,7 +156,13 @@ function writeFiles(dir, o) {
   const memv2Url = 'http://127.0.0.1:8766';
   const graphUrl = 'http://127.0.0.1:8000/mcp/';
   const docker = b === 'graphiti' || b === 'full';
-  if (b !== 'local') write(path.join(abs, '.env'), envText(o.models, o.keys, { dailyTokens: o.dailyTokens, backend: b }), 0o600);
+  const graphStore = GRAPH_STORES[o.graphStore] ? o.graphStore : 'neo4j';
+  const neo4j = docker && graphStore === 'neo4j';
+  if (b !== 'local') {
+    write(path.join(abs, '.env'), envText(o.models, o.keys, {
+      dailyTokens: o.dailyTokens, backend: b, neo4jPassword: neo4j ? crypto.randomBytes(16).toString('hex') : '',
+    }), 0o600);
+  }
 
   if (b === 'memv2' || b === 'full') {
     // The fact store's tokens: a writable one for the plugin's feeder and a read-only one for the Bots. Each Bot reads
@@ -170,13 +185,15 @@ function writeFiles(dir, o) {
     }
     plugin.backends = { ...(plugin.backends || {}), memv2: { url: memv2Url, writeTokenFile: path.join(tokens, 'feeder.token'), tokenFile: path.join(tokens, 'reader.token'), namespace: 'bot-{slug}' } };
   }
+  // Whichever graph database was chosen, the folder holds it as docker-compose.yml, so the commands are the same.
+  const composeFile = GRAPH_STORES[graphStore].compose;
   if (b === 'graphiti') {
-    copy('backend/graphiti/docker-compose.yml', path.join(abs, 'docker-compose.yml'));
+    copy(`backend/graphiti/${composeFile}`, path.join(abs, 'docker-compose.yml'));
     copy('backend/graphiti/config.yaml', path.join(abs, 'config.yaml'));
   }
   if (b === 'full') {
     // A folder that stands alone: the compose's paths point into it, not into this package.
-    copy('backend/full/docker-compose.yml', path.join(abs, 'docker-compose.yml'), (t) => t
+    copy(`backend/full/${composeFile}`, path.join(abs, 'docker-compose.yml'), (t) => t
       .replace('context: ../..', 'context: ./memv2-image').replace('dockerfile: backend/memv2/Dockerfile', 'dockerfile: Dockerfile')
       .replace('../graphiti/config.yaml', './graphiti-config.yaml'));
     copy('backend/graphiti/config.yaml', path.join(abs, 'graphiti-config.yaml'));
@@ -185,6 +202,7 @@ function writeFiles(dir, o) {
   }
   if (docker) {
     steps.push(`启动${b === 'full' ? '两个库' : '图谱'}：在 ${abs} 里运行 docker compose ${MODELS[o.models].local && b === 'full' ? '--profile local ' : ''}up -d${b === 'full' ? ' --build' : ''}（第一次要下载约 11 GB 的官方镜像）。`);
+    if (neo4j) steps.push('想看图谱：浏览器打开 http://127.0.0.1:17474，连接地址填 bolt://127.0.0.1:17687，用户名 neo4j，密码在 .env 的 NEO4J_PASSWORD 里。');
     // Graphiti takes letters, digits, - and _ in a group id, so the group goes by the Bot's id.
     plugin.backends = { ...(plugin.backends || {}), graphiti: { url: graphUrl, group: 'bot-{slug}', dailyTokens: o.dailyTokens } };
   }
@@ -262,6 +280,14 @@ async function wizard(argv) {
       const d = await q(`每个 Bot 每天最多花多少 token？到了就停，第二天接着抽 [${dailyTokens}]：`, String(dailyTokens));
       dailyTokens = Number.isFinite(Number(d)) && Number(d) >= 0 ? Number(d) : dailyTokens;
     }
+    let graphStore = GRAPH_STORES[flag('--graph-store')] ? flag('--graph-store') : 'neo4j';
+    if (backend === 'C' || backend === 'A') {
+      out('\n图谱放在哪种图数据库里？');
+      const stores = Object.keys(GRAPH_STORES);
+      stores.forEach((s, i) => out(`  ${i + 1} ${GRAPH_STORES[s].label}`));
+      const pick = await q(`选 1-${stores.length} [${stores.indexOf(graphStore) + 1}]：`, String(stores.indexOf(graphStore) + 1));
+      graphStore = stores[Number(pick) - 1] || graphStore;
+    }
     const owner = await q('记忆是谁的？工具里这样称呼他 [用户]：', flag('--owner', '用户'));
     const bots = String(await q('哪些 Bot 要有记忆？名字或编号，逗号隔开（可留空，以后在配置里加）：', flag('--bots', '')))
       .split(',').map((x) => x.trim()).filter(Boolean);
@@ -283,7 +309,7 @@ async function wizard(argv) {
       out('没写任何文件。');
       return 1;
     }
-    const r = writeFiles(dir, { backend, models, keys, dailyTokens, owner, bots });
+    const r = writeFiles(dir, { backend, models, keys, dailyTokens, owner, bots, graphStore });
     out(`\n写好了：${r.dir}`);
     r.steps.forEach((s, i) => out(`  ${i + 1}. ${s}`));
     out('\n接 Claude Code 的写法见 README「接到 Claude Code」；各后端的说明在包里的 backend/ 文件夹。');
@@ -314,4 +340,4 @@ if (require.main === module) {
   main(process.argv.slice(2)).then((code) => { process.exitCode = code; });
 }
 
-module.exports = { estimate, estimateText, writeFiles, wizard, main, BACKENDS, MODELS, RATES };
+module.exports = { estimate, estimateText, writeFiles, wizard, main, BACKENDS, MODELS, RATES, GRAPH_STORES };

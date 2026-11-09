@@ -1,0 +1,41 @@
+# javmem's graph store with FalkorDB instead of Neo4j: the official Graphiti MCP server and FalkorDB in one container,
+# from Zep's own image. One container less than docker-compose.yml, and no Neo4j browser to look at the graph.
+# Nothing of anyone's memory is in it: the graph starts empty and fills from what javmem-feed (or the DSH plugin) sends in.
+#   cp .env.example .env    # then choose the models in .env
+#   docker compose -f docker-compose.falkordb.yml up -d
+# The MCP endpoint is http://127.0.0.1:${GRAPHITI_PORT:-8000}/mcp/ ; only this computer can reach it.
+name: javmem-graphiti
+
+services:
+  graphiti:
+    image: zepai/knowledge-graph-mcp:${GRAPHITI_IMAGE_TAG:-1.1.3}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # The server always reads config/config.yaml (its --config default wins over CONFIG_PATH), so ours goes there.
+      CONFIG_PATH: /app/mcp/config/config.yaml
+      GRAPHITI_DB: falkordb
+      FALKORDB_URI: redis://localhost:6379
+      FALKORDB_DATABASE: ${FALKORDB_DATABASE:-javmem}
+      BROWSER: ${FALKORDB_BROWSER:-0}
+      SEMAPHORE_LIMIT: ${SEMAPHORE_LIMIT:-2}
+      GRAPHITI_TELEMETRY_ENABLED: "false"
+    volumes:
+      - ./config.yaml:/app/mcp/config/config.yaml:ro
+      - graph_data:/var/lib/falkordb/data
+    ports:
+      - "127.0.0.1:${GRAPHITI_PORT:-8000}:8000"
+    # Lets the container reach models on this computer (Ollama, a local embedding service) as host.docker.internal.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  graph_data:
