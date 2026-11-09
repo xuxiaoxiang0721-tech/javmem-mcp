@@ -1,17 +1,19 @@
 # 更新记录 / Changelog
 
-## 0.4.0（未发布 / unreleased）
+## 0.4.0（2026-11-09）
 
+- 第一次发 npm，包名 `javmem-mcp`（0.3.0 只发了 GitHub Release）。
 - 过去的对话一次带进来：`history.js`（`javmem-inherit history <文件或文件夹> [--db <本地库>]`）读 ChatGPT、Claude 的 `conversations.json`，Claude Code、Codex 的会话记录和 1.2 版记忆包，只收人和 AI 说的话，每段对话一个会话、标「导入自 某工具」，同一个导出不重复；`estimate` 也认这些文件；附五种格式的虚构样例（`demo/history/`）。README 的「为什么是 javmem」第 2 条补全。
 
 English:
 
+- First npm release, package `javmem-mcp` (0.3.0 went out as a GitHub Release only).
 - Past conversations in one go: `history.js` (`javmem-inherit history <file or folder> [--db <local store>]`) reads ChatGPT's and Claude's `conversations.json`, Claude Code's and Codex's session logs and 1.2 memory packages, keeps only what people and the AI said, one session per conversation marked as imported from that tool, each export once; `estimate` reads them too; made-up samples of the five formats in `demo/history/`. Point 2 of "Why javmem" in full.
 
 ## 0.3.0（2026-11-06）
 
 - 三个服务在 MCP 握手里报的版本号，改成读同目录的 `package.json`（以前写死，`memory-mcp.js` 还报 0.1.0）。
-- 第一次发 npm：包名 `javmem-mcp`；新增命令名 `javmem-mcp`（就是合起来的 `memory-mcp.js`），所以 `npx -y javmem-mcp` 就能起服务。
+- 新增命令名 `javmem-mcp`（就是合起来的 `memory-mcp.js`），所以 `npx -y javmem-mcp` 就能起服务（npm 上从 0.4.0 起才有）。
 - 发版文件：`node scripts/pack.mjs` 从已提交的内容打包（换行都是 LF），生成 npm 包和 GitHub Release 附件。
 - 状态检查：三个程序都认 `javmem/status` 请求（不是工具），回答每个库连不连得上、令牌能不能用，不读记忆，不带令牌。
 - README：开头一句话说清是什么，写明适合谁、不适合谁，接 Claude Code 的一条命令（`claude mcp add … -- npx -y javmem-mcp`）；英文版 `README.en.md` 和中文版内容对等；npm、CI、许可证徽章；CI 在 Node 20、22、24 上跑测试。
@@ -28,7 +30,7 @@ English:
 English:
 
 - The three servers report the version in the `package.json` next to them in the MCP handshake (it was hard-coded, and `memory-mcp.js` said 0.1.0).
-- First npm release, package `javmem-mcp`, with a new `javmem-mcp` command (the combined `memory-mcp.js`), so `npx -y javmem-mcp` starts the server.
+- A new `javmem-mcp` command (the combined `memory-mcp.js`), so `npx -y javmem-mcp` starts the server (on npm from 0.4.0).
 - Release files: `node scripts/pack.mjs` packs the committed tree (LF line endings) into the npm tarball and the GitHub Release asset.
 - Status check: all three servers answer a `javmem/status` request (not a tool) with whether each store answers and takes the token; it reads no memory and carries no token.
 - README: a one-line pitch, who it is for and not for, one command for Claude Code (`claude mcp add … -- npx -y javmem-mcp`); `README.en.md` in English with the same content as the Chinese one; npm, CI and licence badges; CI runs the tests on Node 20, 22 and 24.

@@ -36,7 +36,7 @@
 
 1. **准备**：Node 20 以上；memv2 和 Javis 在运行，每个 Bot 有自己的令牌文件（见「前提」）。
 2. **拿到程序**，两种任选：
-   - npm 包（发布后）：`npx -y javmem-mcp` 就能起合起来的服务，不用先下载；
+   - npm 包：`npx -y javmem-mcp` 就能起合起来的服务，不用先下载；
    - git：`git clone https://github.com/xuxiaoxiang0721-tech/javmem-mcp.git`，没有依赖，不用 `npm install`。
 3. **自测**（git 方式）：`node test/smoke.mjs`，不需要两个库在跑。
 4. **接上**：见下面的「接到 Claude Code」和「接到 DeepSeek Harness（Tobs）」。环境变量至少给 `MEMV2_TOKEN_FILE` 和 `JAVIS_TOKEN_FILE`。
@@ -48,12 +48,12 @@
 ![演示：两个库对照着回答](docs/demo.png)
 
 - 命令行：`git clone` 以后运行 `node scripts/demo.mjs`，五个工具各问一遍。
-- Claude Code（npm 包发布后）：`claude mcp add javmem-demo -e MEMV2_URL=demo -e JAVIS_URL=demo -- npx -y javmem-mcp`，然后问「小雨的游泳课学费交了多少？」「老陈最近怎么了？」。
+- Claude Code：`claude mcp add javmem-demo -e MEMV2_URL=demo -e JAVIS_URL=demo -- npx -y javmem-mcp`，然后问「小雨的游泳课学费交了多少？」「老陈最近怎么了？」。
 - 数据里故意放了几种情况：两个库一致（「图库也有」）；说法不同（学费 2400 和 2600，以 memv2 为准）；只在图库有；一条和原文对不上的编造事实（被过滤掉，回答里提示「另有 1 条和原文对不上」）。分区也能试：`MEMV2_NAMESPACE=work` 加 `MEMV2_BOT_ONLY=1` 只看工作，`JAVIS_SOURCES=chatgpt` 只看一个账号。
 
 ## 接到 Claude Code
 
-一条命令（npm 包发布后）：
+一条命令：
 
 ```bash
 claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_TOKEN_FILE=/path/to/profiles/bot_a.env -e MEMORY_AUDIENCE=cc -- npx -y javmem-mcp

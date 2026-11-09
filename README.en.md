@@ -36,7 +36,7 @@ In DeepSeek Harness's Tobs, the companion plugin [javmem-dsh-plugin](https://git
 
 1. **Prepare**: Node 20 or later; memv2 and Javis running, and a token file for every Bot (see Prerequisites).
 2. **Get the servers**, either way:
-   - the npm package (once published): `npx -y javmem-mcp` starts the combined server, nothing to download first;
+   - the npm package: `npx -y javmem-mcp` starts the combined server, nothing to download first;
    - git: `git clone https://github.com/xuxiaoxiang0721-tech/javmem-mcp.git`; no dependencies, no `npm install`.
 3. **Self-test** (git): `node test/smoke.mjs`; the two stores need not run.
 4. **Connect**: see "With Claude Code" and "With DeepSeek Harness (Tobs)" below. Set at least `MEMV2_TOKEN_FILE` and `JAVIS_TOKEN_FILE`.
@@ -48,12 +48,12 @@ See it work without either store: set both `MEMV2_URL` and `JAVIS_URL` to `demo`
 ![Demo: both stores checked against each other](docs/demo.png)
 
 - In a terminal: after `git clone`, run `node scripts/demo.mjs` to ask each of the five tools once.
-- In Claude Code (once the npm package is published): `claude mcp add javmem-demo -e MEMV2_URL=demo -e JAVIS_URL=demo -- npx -y javmem-mcp`, then ask 「小雨的游泳课学费交了多少？」 (how much were the swimming lessons?) or 「老陈最近怎么了？」 (what is up with Lao Chen?).
+- In Claude Code: `claude mcp add javmem-demo -e MEMV2_URL=demo -e JAVIS_URL=demo -- npx -y javmem-mcp`, then ask 「小雨的游泳课学费交了多少？」 (how much were the swimming lessons?) or 「老陈最近怎么了？」 (what is up with Lao Chen?).
 - The data holds each case on purpose: both stores agree (「图库也有」); they differ (a fee of 2400 against 2600, and memv2 counts); a fact only the graph has; and a made-up fact the source text does not back, which is dropped (the answer says 「另有 1 条和原文对不上」, one more did not match the source). Partitions work too: `MEMV2_NAMESPACE=work` with `MEMV2_BOT_ONLY=1` shows work only, `JAVIS_SOURCES=chatgpt` one account only.
 
 ## With Claude Code
 
-One command (once the npm package is published):
+One command:
 
 ```bash
 claude mcp add javmem -e MEMV2_TOKEN_FILE=/path/to/tokens/bot_a.token -e JAVIS_TOKEN_FILE=/path/to/profiles/bot_a.env -e MEMORY_AUDIENCE=cc -- npx -y javmem-mcp
